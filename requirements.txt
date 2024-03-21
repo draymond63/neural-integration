@@ -1,0 +1,6 @@
+numpy
+scipy
+nengo
+matplotlib
+plotly
+kaleido
