@@ -1,132 +1,91 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from random import *
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
-def ode(state: np.ndarray, inp: np.ndarray):
-    # position rate is equal to velocity
-    pos_x, pos_y, theta, vel_x, vel_y = state
-    dvel, dtheta = inp
-    # velocity rate is equal to the accel broken into the xy basis
-    dvelx = dvel * np.cos(state[2])
-    dvely = dvel * np.sin(state[2])
-    return np.array([vel_x, vel_y, dtheta, dvelx, dvely])
+class Agent:
+    def __init__(self, init_state: np.ndarray, dt: float, process_noise=1e-3, measurement_noise=1e-2):
+        if len(init_state) != 4:
+            raise ValueError("Initial state must be a 4D vector [x, y, vx, vy]")
+        self.x = np.array(init_state)
+        self.F = np.array([[1, 0, dt, 0],
+                           [0, 1, 0, dt],
+                           [0, 0, 1, 0],
+                           [0, 0, 0, 1]])
+        self.H = np.array([[0, 0, 1, 0],
+                           [0, 0, 0, 1]])
+        self.P = np.eye(4) # Initial covariance matrix
+        self.Q = np.eye(4) * process_noise # Process noise
+        self.R = np.eye(2) * measurement_noise # Measurement noise
+
+    def predict(self):
+        self.x = self.F @ self.x
+        self.P = self.F @ self.P @ self.F.T + self.Q
+
+    def update(self, z):
+        y = z - self.H @ self.x
+        S = self.H @ self.P @ self.H.T + self.R
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+        self.x += K @ y
+        self.P = self.P - K @ self.H @ self.P
+
+    def get_std(self):
+        return np.diag(self.P)[:2]
 
 
-def rk4(state, imu, ode, dt):
-    # runs a rk4 numerical integration
-    k1 = dt * ode(state, imu)
-    k2 = dt * ode(state + .5*k1, imu)
-    k3 = dt * ode(state + .5*k2, imu)
-    k4 = dt * ode(state + k3, imu)
+def simulate(path: np.ndarray, dt=0.01):
+    vels = np.diff(path, axis=0) / dt
+    init_state = [*path[0], *vels[0]]
+    agent = Agent(init_state, dt=dt)
+    positions = np.zeros((len(path), 2))
+    positions[0] = path[0]
+    confidence = np.zeros((len(path), 2))
+    confidence[0] = agent.get_std()
 
-    return state + (1./6.)*(k1 + 2.*k2 + 2.*k3 + k4)
-
-def numericalJacobianOfStatePropagationInterface(state, imu, dt):
-    # data contains both the imu and dt, it needs to be broken up for the rk4
-    return rk4(state, imu, ode, dt)
-
-
-def numericalDifference(x, data, dt, ep = .001):
-    # calculates the numerical jacobian
-    y = numericalJacobianOfStatePropagationInterface(x, data, dt)
-
-    A = np.zeros([y.shape[0], x.shape[0]])
-
-    for i in range(x.shape[0]):
-        x[i] += ep
-        y_i = numericalJacobianOfStatePropagationInterface(x, data, dt)
-        A[i] = (y_i - y)/ep
-        x[i] -= ep
-
-    return A
+    for i in range(1, len(path)):
+        agent.predict()
+        positions[i] = agent.x[:2]
+        confidence[i] = agent.get_std()
+        agent.update(vels[i-1])
+    return positions, confidence
 
 
+def get_map_space(positions: np.ndarray, ppm=1):
+    """Returns 2x2 array of maps"""
+    max_dims = np.max(positions, axis=0) + 1
+    min_dims = np.min(positions, axis=0)
+    points = max_dims - min_dims
+    points = points.astype(int)
+    xs = np.linspace(min_dims[0], max_dims[0], points[0])
+    ys = np.linspace(min_dims[1], max_dims[1], points[1])
+    return xs, ys
 
-# Sampling period
-dt = .1
-t_steps = 500
-state = np.zeros(5)
+def gaussian_2d_point(x, y, mu_x, mu_y, std_x, std_y):
+    """Returns the value of the 2D Gaussian distribution at (x, y)"""
+    term1 = 1 / (2 * np.pi * std_x * std_y)
+    term2 = np.exp(-((x - mu_x)**2 / (2 * std_x**2) + (y - mu_y)**2 / (2 * std_y**2)))
+    return term1 * term2
 
-state_hist = np.zeros([t_steps, 5])
-imu_hist = np.zeros([t_steps, 2])
-
-
-# Setup simulated data
-for i in range(t_steps):
-    # generate a rate to propagate states with
-    accel = uniform(-10, 10)
-    theta_dot = uniform(-0.2, 0.2)
-    imu = np.array([accel, theta_dot])
-
-    # propagating the state with the IMU measurement
-    state = rk4(state, imu, ode, dt)
-
-    # saving off the current state
-    state_hist[i] = state *1.
-    imu_hist[i] = imu*1.
+def gaussian_2d(xs, ys, mu, std):
+    x, y = np.meshgrid(xs, ys)
+    return gaussian_2d_point(x, y, *mu, *std)
 
 
-# kf stuff
-state = np.zeros([5])
-cov = np.eye(5) * .001
-
-kf_state_hist = np.zeros([t_steps, 5])
-kf_cov_hist = np.zeros([t_steps, 5,5])
-kf_meas_hist = np.zeros([t_steps, 3])
-kf_imu_hist = np.zeros([t_steps, 2])
-
-# imu accel and gyro noise
-accel_cov = 1e-4
-gyro_cov  = 1e-4
-Q_imu = np.array([[.1, 0],[0, .01]])
-
-r_meas = 1e-6
-
-#  running the data through the KF with noised measurements
-for i in range(t_steps):
-
-    # propagating the state
-    imu_meas = imu_hist[i]
-    imu_meas[0] += np.random.randn(1)[0] * accel_cov**.5
-    imu_meas[1] += np.random.randn(1)[0] * gyro_cov**.5
-
-    A = numericalDifference(state, imu_meas, dt)
-    cov = A.dot(cov.dot(A.T))
-
-    ###
-    # TODO : calculate how the accel and gyro noise turn into the process noise for the system
-    ###
-    # A_state_wrt_imu = jacobianOfPropagationWrtIMU
-    # Q = A_state_wrt_imu * Q_imu * A_state_wrt_imu.T
-    # cov += Q
-    # sloppy placeholder
-    cov += np.eye(5) * .1
-
-    state = rk4(state, imu_meas, ode, dt)
-
-    # measurement update
-    zt = state[:3] + np.random.randn(1) *r_meas**.5
-    zt_hat = state[:3]
-
-    H = np.zeros([3,5])
-    H[:3,:3] = np.eye(3)
-
-    S = np.linalg.inv(H.dot(cov.dot(H.T)) + r_meas * np.eye(3))
-    K = cov.dot(H.T).dot( S )
-
-    state = state + K.dot(zt - zt_hat)
-    cov = (np.eye(5) - K.dot(H)).dot(cov)
-
-    kf_state_hist[i] = state
-    kf_cov_hist[i] = cov
-    kf_meas_hist[i] = zt_hat
-    kf_imu_hist[i] = imu_meas
+def plot_heatmap(positions: np.ndarray, confidences: np.ndarray, ppm=10):
+    xs, ys = get_map_space(positions, ppm)
+    fig = make_subplots(rows=len(positions), cols=1)
+    for i, (pos, std) in enumerate(zip(positions, confidences), 1):
+        dist = gaussian_2d(xs, ys, pos, std)
+        fig.add_trace(go.Heatmap(z=dist, type='heatmap', colorscale='Viridis'), row=i, col=1)
+    fig.update_layout(
+        title="Agent Position Confidence Over Time",
+        xaxis_title="X Position",
+        yaxis_title="Y Position"
+    )
+    fig.show()
 
 
-
-plt.plot(state_hist[:,0], state_hist[:,1], linewidth=3)
-plt.plot(kf_state_hist[:,0], kf_state_hist[:,1], linewidth=3)
-plt.legend(['Ground truth', 'kf est'])
-plt.grid()
-plt.show()
+if __name__ == "__main__":
+    path = np.array([[0, 0], [1, 1], [2, 2], [3, 3], [4, 2]])
+    positions, confidences = simulate(path)
+    plot_heatmap(positions, confidences)
