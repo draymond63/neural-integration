@@ -3,8 +3,11 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
+np.random.seed(0)
+
+
 class Agent:
-    def __init__(self, init_state: np.ndarray, dt: float, process_noise=1e-3, measurement_noise=1e-2):
+    def __init__(self, init_state: np.ndarray, dt: float, init_uncertainty=1e-1, process_noise=1e-2, measurement_noise=1e-1):
         if len(init_state) != 4:
             raise ValueError("Initial state must be a 4D vector [x, y, vx, vy]")
         self.x = np.array(init_state)
@@ -14,7 +17,7 @@ class Agent:
                            [0, 0, 0, 1]])
         self.H = np.array([[0, 0, 1, 0],
                            [0, 0, 0, 1]])
-        self.P = np.eye(4) # Initial covariance matrix
+        self.P = np.eye(4) * init_uncertainty # Initial covariance matrix
         self.Q = np.eye(4) * process_noise # Process noise
         self.R = np.eye(2) * measurement_noise # Measurement noise
 
@@ -34,6 +37,7 @@ class Agent:
 
 
 def simulate(path: np.ndarray, dt=0.01):
+    timestamps = np.linspace(0, len(path) * dt, len(path))
     vels = np.diff(path, axis=0) / dt
     init_state = [*path[0], *vels[0]]
     agent = Agent(init_state, dt=dt)
@@ -47,14 +51,27 @@ def simulate(path: np.ndarray, dt=0.01):
         positions[i] = agent.x[:2]
         confidence[i] = agent.get_std()
         agent.update(vels[i-1])
-    return positions, confidence
+    return timestamps, positions, confidence
+
+
+
+def generate_path(n_steps, domain_dim, smoothing_window=200):
+    """Generate a random continuous path in 2D space"""
+    path = np.cumsum(np.random.randn(n_steps, domain_dim), axis=0)
+    smoothing_window = min(smoothing_window, n_steps)
+    window = np.hanning(smoothing_window)
+    path[:, 0] = np.convolve(path[:, 0], window, mode='same')
+    path[:, 1] = np.convolve(path[:, 1], window, mode='same')
+    path = 2 * path / np.max(np.abs(path), axis=0)
+    path -= path[0]
+    return path
 
 
 def get_map_space(positions: np.ndarray, ppm=1):
     """Returns 2x2 array of maps"""
     max_dims = np.max(positions, axis=0) + 1
     min_dims = np.min(positions, axis=0)
-    points = max_dims - min_dims
+    points = (max_dims - min_dims) * ppm
     points = points.astype(int)
     xs = np.linspace(min_dims[0], max_dims[0], points[0])
     ys = np.linspace(min_dims[1], max_dims[1], points[1])
@@ -71,21 +88,45 @@ def gaussian_2d(xs, ys, mu, std):
     return gaussian_2d_point(x, y, *mu, *std)
 
 
-def plot_heatmap(positions: np.ndarray, confidences: np.ndarray, ppm=10):
+def compare_paths(ts: np.ndarray, path1: np.ndarray, path2: np.ndarray):
+    fig = make_subplots(rows=2, cols=1)
+    fig.add_trace(go.Scatter(x=ts, y=path1[:,0], mode='lines', name='Path 1'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=ts, y=path2[:,0], mode='lines', name='Path 2'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=ts, y=path1[:,1], mode='lines', name='Path 1'), row=2, col=1)
+    fig.add_trace(go.Scatter(x=ts, y=path2[:,1], mode='lines', name='Path 2'), row=2, col=1)
+    fig.show()
+    # fig = go.Figure()
+    # fig.add_trace(go.Scatter(x=path1[:0], y=path1[:,1], mode='lines', name='Path 1'))
+    # fig.add_trace(go.Scatter(x=path2[:0], y=path2[:,1], mode='lines', name='Path 2'))
+    # fig.show()
+
+
+def animate(positions: np.ndarray, confidences: np.ndarray, ppm: int=10):
     xs, ys = get_map_space(positions, ppm)
-    fig = make_subplots(rows=len(positions), cols=1)
-    for i, (pos, std) in enumerate(zip(positions, confidences), 1):
-        dist = gaussian_2d(xs, ys, pos, std)
-        fig.add_trace(go.Heatmap(z=dist, type='heatmap', colorscale='Viridis'), row=i, col=1)
-    fig.update_layout(
-        title="Agent Position Confidence Over Time",
-        xaxis_title="X Position",
-        yaxis_title="Y Position"
+    dists = np.array([gaussian_2d(xs, ys, pos, std) for pos, std in zip(positions, confidences)])
+    max_amp = np.max(dists, axis=None)
+    # print(dists.shape)
+    heatmaps = [go.Heatmap(x=xs, y=ys, z=dist, zmax=max_amp, colorscale='Viridis') for dist in dists]
+    frames = [go.Frame(data=[heatmap]) for heatmap in heatmaps]
+    fig = go.Figure(
+        data = [heatmaps[0]],
+        layout=go.Layout(
+            updatemenus=[dict(
+                type="buttons",
+                buttons=[dict(label="Play",
+                            method="animate",
+                            args=[None])])],
+            title="Heatmap Animation",
+            xaxis_title="X Position",
+            yaxis_title="Y Position"
+        ),
+        frames=frames,
     )
     fig.show()
 
 
 if __name__ == "__main__":
-    path = np.array([[0, 0], [1, 1], [2, 2], [3, 3], [4, 2]])
-    positions, confidences = simulate(path)
-    plot_heatmap(positions, confidences)
+    path = generate_path(100, 2)
+    timestamps, positions, confidences = simulate(path)
+    compare_paths(timestamps, path, positions)
+    animate(positions, confidences)
