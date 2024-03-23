@@ -36,32 +36,29 @@
 2. How are landmarks being identified? How does the model know that landmark A is not landmark B?
    - The index of the closest landmark is immediately given to the network as `landmark_id_input` (which directly corresponds to the function `landmark_id_func`)
 3. Why is velocity the input? Shouldn't it be acceleration?
+   - Velocity exists in the brain
 4. Can the agent rotate? Or only move translationally?
+   - State is x & y, nothing else
 5. Whats the point of cleanup?
    - Smooths PI output using grid cells
 6. Inuitive understanding of SSP Space?
-7. PI model is kinda like an equivalent to a lone IMU?
 
 ### Output
 7. In `run_slam`, why is the path integrator so bad? It seems like the localization is entirely due to landmark corrections. It's better in lone PI trial.
 8. In `slam_vs_pi_trials`, PI overshoots but also has sharp discontinuities. Why?
-9. Both SLAM and PI update pretty infrequently. Why?
+   - Decoding maps the same pointer to an infinite number of x, y values.
+9.  Both SLAM and PI update pretty infrequently. How would I increase the resolution?
+   - Byproduct of decoding. Change `num_samples` in `SSPSpace.decode`
 
 
 # Project Plan
 Compare Kalman filter to neural path integration
  - Add uncertainty integration to SSP encoding
- - 
 
 
 # Ideas
 - Generalized phase correlation that can handle rotation of the visual field?
 
-
-```
-cd experiments/
-python run_slam.py --domain-dim 2 --seed 0  --save True --plot True --save_plot True --ssp_dim 55 --pi_n_neurons 500
-```
 
 
 Sources

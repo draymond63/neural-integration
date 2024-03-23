@@ -9,7 +9,7 @@ np.random.seed(0)
 
 
 class Agent:
-    def __init__(self, init_state: np.ndarray, dt: float, init_uncertainty=1e-1, process_noise=1e-2, measurement_noise=1e-2):
+    def __init__(self, init_state: np.ndarray, dt: float, init_uncertainty=1e-5, process_noise=1e-4, measurement_noise=1e-4):
         if len(init_state) != 4:
             raise ValueError("Initial state must be a 4D vector [x, y, vx, vy]")
         self.x = np.array(init_state)
@@ -94,43 +94,44 @@ def plot_bounded_path(ts: np.ndarray, *paths: Tuple[np.ndarray, np.ndarray]):
     fig.show()
 
 
-def get_map_space(positions: np.ndarray, ppm=1):
+def get_map_space(positions: np.ndarray, ppm=1, padding=0.1):
     """Returns 2x2 array of maps"""
     max_dims = np.max(positions, axis=0) + 1
     min_dims = np.min(positions, axis=0)
-    points = (max_dims - min_dims) * ppm
-    points = points.astype(int)
+    delta = max_dims - min_dims
+    delta += delta * padding
+    points = (delta * ppm).astype(int)
     xs = np.linspace(min_dims[0], max_dims[0], points[0])
     ys = np.linspace(min_dims[1], max_dims[1], points[1])
     return xs, ys
 
 def gaussian_2d(xs, ys, mean, cov):
-    mean = np.array([0, 0])
-    cov = np.array([[1, 0], [0, 1]])
     rv = multivariate_normal(mean, cov)
     return np.array([[rv.pdf([x, y]) for x in xs] for y in ys])
 
-def animate(positions: np.ndarray, covariances: np.ndarray, ppm: int=10):
+def plot_heat_map(positions, covariances, num_plots=9, ppm=30, normalize=False):
+    cols = int(np.ceil(np.sqrt(num_plots)))
+    rows = int(np.ceil(num_plots / cols))
+    fig = make_subplots(rows=rows, cols=cols)
     xs, ys = get_map_space(positions, ppm)
-    dists = np.array([gaussian_2d(xs, ys, pos, cov) for pos, cov in zip(positions, covariances)])
-    print(dists.shape)
-    max_amp = np.max(dists, axis=None)
-    heatmaps = [go.Heatmap(x=xs, y=ys, z=dist, zmax=max_amp, colorscale='Viridis') for dist in dists]
-    frames = [go.Frame(data=[heatmap]) for heatmap in heatmaps]
-    fig = go.Figure(
-        data = [heatmaps[0]],
-        layout=go.Layout(
-            updatemenus=[dict(
-                type="buttons",
-                buttons=[dict(label="Play",
-                            method="animate",
-                            args=[None])])],
-            title="Heatmap Animation",
-            xaxis_title="X Position",
-            yaxis_title="Y Position"
-        ),
-        frames=frames,
-    )
+    t_spacing = np.ceil(len(positions) / num_plots).astype(int)
+    p = positions[::t_spacing]
+    c = covariances[::t_spacing]
+    dists = np.array([gaussian_2d(xs, ys, pos, cov) for pos, cov in zip(p, c)])
+    zmax = np.max(dists, axis=None)
+    dists /= zmax
+    for i in range(num_plots):
+        fig.add_heatmap(
+            x=xs,
+            y=ys,
+            z=dists[i],
+            zmin=0,
+            row=i//cols+1,
+            col=i%cols+1,
+            zmax=1 if normalize else None,
+            showscale=normalize,
+        )
+    fig.update_layout(showlegend=False)
     fig.show()
 
 
@@ -138,3 +139,4 @@ if __name__ == "__main__":
     path = generate_path(1000, 2)
     timestamps, positions, covariances = simulate(path)
     plot_bounded_path(timestamps, [positions, covariances])
+    plot_heat_map(positions, covariances)
