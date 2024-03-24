@@ -4,7 +4,7 @@ from plotly.subplots import make_subplots
 
 from pathintegration import PathIntegration
 from sspspace import HexagonalSSPSpace
-from utils import get_velocity_scale_factor, plot_heatmaps
+from utils import get_velocity_scale_factor, plot_heatmaps, get_sample_spacing, plot_bounded_path
 
 
 
@@ -52,19 +52,20 @@ def simulate(path: np.ndarray, dt=0.01, seed=0, ssp_dim=256, neurons=500, save=T
     return sim.data[pi_output_p]
 
 
-def plot_pi_heatmaps(pi_output: np.ndarray, ssp_space: HexagonalSSPSpace, samples_per_dim=100, **kwargs):
+def plot_pi_heatmaps(pi_output: np.ndarray, ssp_space: HexagonalSSPSpace, samples_per_dim=100, num_plots=9, **kwargs):
     points = ssp_space.get_sample_points(samples_per_dim=samples_per_dim, method='grid') # (timesteps, domain_dim)
     ssp_grid = ssp_space.encode(points) # (timesteps, ssp_dim)
     pi_norms = np.linalg.norm(pi_output, axis=1)[:, np.newaxis]
-    pi_output /= np.where(pi_norms < 1e-6, 1, pi_norms)
+    pi_output /= np.where(pi_norms < 1e-6, 1, pi_norms) # (timesteps, ssp_dim)
     # Cosine similarity between encoded grid points and pi output (since both are unit vectors)
-    similarities = ssp_grid @ pi_output.T # (samples_per_dim*samples_per_dim, timesteps)
+    t_spacing = get_sample_spacing(pi_output, num_plots)
+    similarities = ssp_grid @ pi_output[::t_spacing].T # (samples_per_dim*samples_per_dim, timesteps)
     similarities = similarities.reshape(samples_per_dim, samples_per_dim, -1).transpose(2,0,1) # (timesteps, samples_per_dim, samples_per_dim)
     # domain_bounds = np.min(points, axis=0), np.max(points, axis=0)
     # TODO: Set boundaries properly
     xs = np.linspace(-10, 10, samples_per_dim)
     ys = np.linspace(-10, 10, samples_per_dim)
-    plot_heatmaps(xs, ys, similarities, **kwargs)
+    plot_heatmaps(xs, ys, similarities, num_plots=9, **kwargs)
 
 
 
@@ -77,7 +78,7 @@ def generate_path(T: float, dt: float, domain_dim: int, limit=0.1, radius=1, see
 
 if __name__ == "__main__":
     # domain_dim = 2
-    # T = 30
+    # T = 60
     # dt = 0.001
     # path = generate_path(T, dt, domain_dim)
     # pi_out = simulate(path, dt)

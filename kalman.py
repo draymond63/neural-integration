@@ -1,9 +1,7 @@
 import numpy as np
-from plotly.subplots import make_subplots
 from scipy.stats import multivariate_normal
-from typing import Tuple
 
-from utils import plot_heatmaps
+from utils import plot_heatmaps, get_sample_spacing
 
 
 class Agent:
@@ -68,31 +66,6 @@ def generate_path(n_steps, domain_dim, smoothing_window=200):
     return path
 
 
-def plot_bounded_path(ts: np.ndarray, *paths: Tuple[np.ndarray, np.ndarray]):
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1)
-    dims = ['x', 'y']
-    colors = ['blue', 'red', 'green', 'purple', 'orange']
-    bound_params = dict(line=dict(dash='dash'), showlegend=False, mode='lines', col=1)
-
-    for idx, (path, covariances) in enumerate(paths):
-        design_params = dict(mode='lines', showlegend=len(paths) > 1, col=1)
-        design_params['marker'] = dict(color=colors[idx])
-        bound_params['marker'] = dict(color=colors[idx])
-        for dim, dim_label in enumerate(dims):
-            design_params['row'] = dim + 1
-            bound_params['row'] = dim + 1
-            stds = np.sqrt(np.diagonal(covariances, axis1=1, axis2=2))    
-            fig.add_scatter(x=ts, y=path[:,dim], name=f"Path {idx}", **design_params)
-            fig.add_scatter(x=ts, y=path[:,dim] + stds[:,dim], **bound_params)
-            fig.add_scatter(x=ts, y=path[:,dim] - stds[:,dim], **bound_params)
-            design_params['showlegend'] = False
-
-    for i, dim_label in enumerate(dims, 1):
-        fig.update_yaxes(title_text=f"{dim_label.capitalize()}", row=i, col=1)
-    fig.update_xaxes(title_text="Time (s)", row=len(dims), col=1)
-    fig.show()
-
-
 def get_map_space(positions: np.ndarray, ppm=1, padding=0.1):
     """Returns 2x2 array of maps"""
     max_dims = np.max(positions, axis=0) + 1
@@ -110,7 +83,7 @@ def gaussian_2d(xs, ys, mean, cov):
     return np.array([[rv.pdf([x, y]) for x in xs] for y in ys])
 
 def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, ppm=30, num_plots=9, **kwargs):
-    t_spacing = np.ceil(len(positions) / num_plots).astype(int)
+    t_spacing = get_sample_spacing(positions, num_plots)
     p = positions[::t_spacing]
     c = covariances[::t_spacing]
     xs, ys = get_map_space(positions, ppm)
@@ -123,5 +96,6 @@ def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, ppm=30,
 if __name__ == "__main__":
     path = generate_path(1000, 2)
     timestamps, positions, covariances = simulate(path)
-    plot_bounded_path(timestamps, [positions, covariances])
+    stds = np.sqrt(np.diagonal(covariances, axis1=1, axis2=2))
+    plot_bounded_path(timestamps, [positions, stds])
     plot_kalman_heatmaps(positions, covariances)

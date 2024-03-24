@@ -1,6 +1,7 @@
 import numpy as np
 import scipy 
 from plotly.subplots import make_subplots
+from typing import Tuple
 
 
 def sparsity_to_x_intercept(d, p):
@@ -36,4 +37,32 @@ def plot_heatmaps(x, y, zs, num_plots=9, normalize=False):
             showscale=normalize,
         )
     fig.update_layout(showlegend=False)
+    fig.show()
+
+
+def get_sample_spacing(arr: np.ndarray, num_samples: int):
+    return np.ceil(len(arr) / num_samples).astype(int)
+
+
+def plot_bounded_path(ts: np.ndarray, *paths: Tuple[np.ndarray, np.ndarray]):
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1)
+    dims = ['x', 'y']
+    colors = ['blue', 'red', 'green', 'purple', 'orange']
+    bound_params = dict(line=dict(dash='dash'), showlegend=False, mode='lines', col=1)
+
+    for idx, (path, stdevs) in enumerate(paths):
+        design_params = dict(mode='lines', showlegend=len(paths) > 1, col=1)
+        design_params['marker'] = dict(color=colors[idx])
+        bound_params['marker'] = dict(color=colors[idx])
+        for dim, dim_label in enumerate(dims):
+            design_params['row'] = dim + 1
+            bound_params['row'] = dim + 1
+            fig.add_scatter(x=ts, y=path[:,dim], name=f"Path {idx}", **design_params)
+            fig.add_scatter(x=ts, y=path[:,dim] + stdevs[:,dim], **bound_params)
+            fig.add_scatter(x=ts, y=path[:,dim] - stdevs[:,dim], **bound_params)
+            design_params['showlegend'] = False
+
+    for i, dim_label in enumerate(dims, 1):
+        fig.update_yaxes(title_text=f"{dim_label.capitalize()}", row=i, col=1)
+    fig.update_xaxes(title_text="Time (s)", row=len(dims), col=1)
     fig.show()
