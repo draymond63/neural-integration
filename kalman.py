@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import multivariate_normal
 
-from utils import plot_heatmaps, get_sample_spacing
+from utils import plot_heatmaps, plot_bounded_path, get_sample_spacing
 
 
 class Agent:
@@ -36,6 +36,7 @@ class Agent:
 
 def simulate(path: np.ndarray, dt=0.01, seed=0):
     np.random.seed(seed)
+    print("Starting Kalman simulation...")
     timestamps = np.linspace(0, len(path) * dt, len(path))
     vels = np.diff(path, axis=0) / dt
     init_state = [*path[0], *vels[0]]
@@ -50,6 +51,7 @@ def simulate(path: np.ndarray, dt=0.01, seed=0):
         positions[i] = agent.x[:2]
         covariances[i] = agent.get_pos_cov()
         agent.update(vels[i-1])
+    print("Kalman simulation complete")
     return timestamps, positions, covariances
 
 

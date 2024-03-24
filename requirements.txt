@@ -3,4 +3,4 @@ scipy
 nengo
 matplotlib
 plotly
-kaleido
+joblib

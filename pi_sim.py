@@ -3,15 +3,13 @@ import numpy as np
 from plotly.subplots import make_subplots
 
 from pathintegration import PathIntegration
-from sspspace import HexagonalSSPSpace
-from utils import get_velocity_scale_factor, plot_heatmaps, get_sample_spacing, plot_bounded_path
+from sspspace import HexagonalSSPSpace, SSPSpace
+from utils import memoize, get_velocity_scale_factor, plot_heatmaps, get_sample_spacing
 
 
-
-def simulate(path: np.ndarray, dt=0.01, seed=0, ssp_dim=256, neurons=500, save=True, plot=True):
-    duration = path.shape[0] * dt
+@memoize.cache(ignore=['ssp_space'])
+def simulate(path: np.ndarray, ssp_space: SSPSpace, dt=0.01, seed=0, neurons=500, save=True, plot=True):
     domain_dim = path.shape[1]
-    ssp_space = HexagonalSSPSpace(domain_dim, ssp_dim)
     d = ssp_space.ssp_dim # Might differ from ssp_dim unfortunately
     velocity_data = np.diff(path, axis=0) / dt
     # function that returns (possible scaled by vel_scaling_factor) agent's velocity at time t
@@ -24,6 +22,8 @@ def simulate(path: np.ndarray, dt=0.01, seed=0, ssp_dim=256, neurons=500, save=T
         nengo.Connection(velocity, pathintegrator.velocity_input, synapse=0.01) 
         nengo.Connection(init_state, pathintegrator.input, synapse=None)
         pi_output_p = nengo.Probe(pathintegrator.output, synapse=0.05)
+    # Simulate!
+    duration = path.shape[0] * dt
     sim = nengo.Simulator(model)
     with sim:
         sim.run(duration)
@@ -56,10 +56,10 @@ def plot_pi_heatmaps(pi_output: np.ndarray, ssp_space: HexagonalSSPSpace, sample
     points = ssp_space.get_sample_points(samples_per_dim=samples_per_dim, method='grid') # (timesteps, domain_dim)
     ssp_grid = ssp_space.encode(points) # (timesteps, ssp_dim)
     pi_norms = np.linalg.norm(pi_output, axis=1)[:, np.newaxis]
-    pi_output /= np.where(pi_norms < 1e-6, 1, pi_norms) # (timesteps, ssp_dim)
+    ssp_output = pi_output / np.where(pi_norms < 1e-6, 1, pi_norms) # (timesteps, ssp_dim)
     # Cosine similarity between encoded grid points and pi output (since both are unit vectors)
-    t_spacing = get_sample_spacing(pi_output, num_plots)
-    similarities = ssp_grid @ pi_output[::t_spacing].T # (samples_per_dim*samples_per_dim, timesteps)
+    t_spacing = get_sample_spacing(ssp_output, num_plots)
+    similarities = ssp_grid @ ssp_output[::t_spacing].T # (samples_per_dim*samples_per_dim, timesteps)
     similarities = similarities.reshape(samples_per_dim, samples_per_dim, -1).transpose(2,0,1) # (timesteps, samples_per_dim, samples_per_dim)
     # domain_bounds = np.min(points, axis=0), np.max(points, axis=0)
     # TODO: Set boundaries properly
@@ -80,8 +80,9 @@ if __name__ == "__main__":
     # domain_dim = 2
     # T = 60
     # dt = 0.001
+    # ssp_space = HexagonalSSPSpace(domain_dim, 256)
     # path = generate_path(T, dt, domain_dim)
-    # pi_out = simulate(path, dt)
+    # pi_out = simulate(path, ssp_space, dt)
 
     prev = np.load('pathintegration.npz', allow_pickle=True)
     pi_out = prev['pathintegrator_output']

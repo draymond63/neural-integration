@@ -1,7 +1,11 @@
 import numpy as np
 import scipy 
+from joblib import Memory
 from plotly.subplots import make_subplots
 from typing import Tuple
+
+
+memoize = Memory(location='cache', verbose=0)
 
 
 def sparsity_to_x_intercept(d, p):
