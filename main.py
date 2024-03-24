@@ -1,4 +1,5 @@
 import numpy as np
+from logging import getLogger
 
 from utils import plot_bounded_path
 from kalman import simulate as kalman_simulate, plot_kalman_heatmaps
@@ -7,6 +8,7 @@ from sspspace import HexagonalSSPSpace
 
 
 if __name__ == "__main__":
+    log = getLogger(__name__)
     domain_dim = 2
     T = 60
     dt = 0.001
@@ -16,8 +18,8 @@ if __name__ == "__main__":
     pi_out = pi_simulate(path, ssp_space, dt)
     timestamps, k_pos, cov = kalman_simulate(path, dt)
     plot_pi_heatmaps(pi_out, ssp_space, normalize=True)
-    plot_kalman_heatmaps(k_pos, cov)
-    print("Decoding...")
+    plot_kalman_heatmaps(k_pos, cov, bounds=(-10, 10), ppm=5)
+    log.info("Decoding...")
     pi_pos = ssp_space.decode(pi_out, 'from-set', 'grid', num_samples=100)
     plot_bounded_path(
         timestamps,

@@ -43,6 +43,8 @@
    - Smooths PI output using grid cells
 6. Inuitive understanding of SSP Space?
 
+7. Cosine similarity already has diffusion. Should I use a different distance metric?
+
 ### Output
 7. In `run_slam`, why is the path integrator so bad? It seems like the localization is entirely due to landmark corrections. It's better in lone PI trial.
 8. In `slam_vs_pi_trials`, PI overshoots but also has sharp discontinuities. Why?

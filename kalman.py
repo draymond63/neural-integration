@@ -1,4 +1,5 @@
 import numpy as np
+from logging import getLogger
 from scipy.stats import multivariate_normal
 
 from utils import plot_heatmaps, plot_bounded_path, get_sample_spacing
@@ -34,13 +35,15 @@ class Agent:
         return self.P[:2, :2]
 
 
-def simulate(path: np.ndarray, dt=0.01, seed=0):
-    np.random.seed(seed)
-    print("Starting Kalman simulation...")
+def simulate(path: np.ndarray, dt=0.01, noise=1e-5):
+    log = getLogger(__name__)
+    log.info("Starting Kalman simulation...")
     timestamps = np.linspace(0, len(path) * dt, len(path))
     vels = np.diff(path, axis=0) / dt
+    if noise:
+        vels += np.random.randn(*vels.shape) * noise
     init_state = [*path[0], *vels[0]]
-    agent = Agent(init_state, dt=dt)
+    agent = Agent(init_state, dt=dt, measurement_noise=noise)
     positions = np.zeros((len(path), 2))
     positions[0] = path[0]
     covariances = np.zeros((len(path), 2, 2))
@@ -51,7 +54,7 @@ def simulate(path: np.ndarray, dt=0.01, seed=0):
         positions[i] = agent.x[:2]
         covariances[i] = agent.get_pos_cov()
         agent.update(vels[i-1])
-    print("Kalman simulation complete")
+    log.info("Kalman simulation complete")
     return timestamps, positions, covariances
 
 
@@ -84,11 +87,15 @@ def gaussian_2d(xs, ys, mean, cov):
     x, y = np.meshgrid(xs, ys)
     return np.array([[rv.pdf([x, y]) for x in xs] for y in ys])
 
-def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, ppm=30, num_plots=9, **kwargs):
+def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, bounds=None, ppm=30, num_plots=9, **kwargs):
     t_spacing = get_sample_spacing(positions, num_plots)
     p = positions[::t_spacing]
     c = covariances[::t_spacing]
-    xs, ys = get_map_space(positions, ppm)
+    if bounds is None:
+        xs, ys = get_map_space(positions, ppm)
+    else:
+        delta = bounds[1] - bounds[0]
+        xs, ys = np.linspace(bounds[0], bounds[1], delta*ppm), np.linspace(bounds[0], bounds[1], delta*ppm)
     dists = np.array([gaussian_2d(xs, ys, pos, cov) for pos, cov in zip(p, c)])
     zmax = np.max(dists, axis=None)
     dists /= zmax
@@ -96,8 +103,9 @@ def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, ppm=30,
 
 
 if __name__ == "__main__":
+    np.random.seed(0)
     path = generate_path(1000, 2)
-    timestamps, positions, covariances = simulate(path)
+    timestamps, positions, covariances = simulate(path, noise=1e-1)
     stds = np.sqrt(np.diagonal(covariances, axis1=1, axis2=2))
-    plot_bounded_path(timestamps, [positions, stds])
-    plot_kalman_heatmaps(positions, covariances)
+    plot_bounded_path(timestamps, [path, np.zeros((len(path), 2))], [positions, stds])
+    # plot_kalman_heatmaps(positions, covariances)
