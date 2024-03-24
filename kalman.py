@@ -1,11 +1,9 @@
 import numpy as np
-import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from scipy.stats import multivariate_normal
 from typing import Tuple
 
-
-np.random.seed(0)
+from utils import plot_heatmaps
 
 
 class Agent:
@@ -38,7 +36,8 @@ class Agent:
         return self.P[:2, :2]
 
 
-def simulate(path: np.ndarray, dt=0.01):
+def simulate(path: np.ndarray, dt=0.01, seed=0):
+    np.random.seed(seed)
     timestamps = np.linspace(0, len(path) * dt, len(path))
     vels = np.diff(path, axis=0) / dt
     init_state = [*path[0], *vels[0]]
@@ -107,36 +106,22 @@ def get_map_space(positions: np.ndarray, ppm=1, padding=0.1):
 
 def gaussian_2d(xs, ys, mean, cov):
     rv = multivariate_normal(mean, cov)
+    x, y = np.meshgrid(xs, ys)
     return np.array([[rv.pdf([x, y]) for x in xs] for y in ys])
 
-def plot_heat_map(positions, covariances, num_plots=9, ppm=30, normalize=False):
-    cols = int(np.ceil(np.sqrt(num_plots)))
-    rows = int(np.ceil(num_plots / cols))
-    fig = make_subplots(rows=rows, cols=cols)
-    xs, ys = get_map_space(positions, ppm)
+def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, ppm=30, num_plots=9, **kwargs):
     t_spacing = np.ceil(len(positions) / num_plots).astype(int)
     p = positions[::t_spacing]
     c = covariances[::t_spacing]
+    xs, ys = get_map_space(positions, ppm)
     dists = np.array([gaussian_2d(xs, ys, pos, cov) for pos, cov in zip(p, c)])
     zmax = np.max(dists, axis=None)
     dists /= zmax
-    for i in range(num_plots):
-        fig.add_heatmap(
-            x=xs,
-            y=ys,
-            z=dists[i],
-            zmin=0,
-            row=i//cols+1,
-            col=i%cols+1,
-            zmax=1 if normalize else None,
-            showscale=normalize,
-        )
-    fig.update_layout(showlegend=False)
-    fig.show()
+    plot_heatmaps(xs, ys, dists, num_plots, **kwargs)
 
 
 if __name__ == "__main__":
     path = generate_path(1000, 2)
     timestamps, positions, covariances = simulate(path)
     plot_bounded_path(timestamps, [positions, covariances])
-    plot_heat_map(positions, covariances)
+    plot_kalman_heatmaps(positions, covariances)
