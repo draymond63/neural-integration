@@ -3,13 +3,14 @@ import numpy as np
 from plotly.subplots import make_subplots
 
 from pathintegration import PathIntegration
-from sspspace import HexagonalSSPSpace, SSPSpace
+from sspspace import HexagonalSSPSpace
 from utils import memoize, get_velocity_scale_factor, plot_heatmaps, get_sample_spacing
 
 
-@memoize.cache(ignore=['ssp_space'])
-def simulate(path: np.ndarray, ssp_space: SSPSpace, dt=0.01, seed=0, neurons=500, save=True, plot=True):
+@memoize.cache()
+def simulate(path: np.ndarray, dt=0.01, seed=0, neurons=500, plot=True, **kwargs):
     domain_dim = path.shape[1]
+    ssp_space = HexagonalSSPSpace(domain_dim, **kwargs)
     d = ssp_space.ssp_dim # Might differ from ssp_dim unfortunately
     velocity_data = np.diff(path, axis=0) / dt
     # function that returns (possible scaled by vel_scaling_factor) agent's velocity at time t
@@ -29,19 +30,6 @@ def simulate(path: np.ndarray, ssp_space: SSPSpace, dt=0.01, seed=0, neurons=500
         sim.run(duration)
     pi_sim_path = ssp_space.decode(sim.data[pi_output_p], 'from-set','grid', num_samples=100)
 
-    if save:
-        np.savez(
-            'pathintegration.npz',
-            path=path,
-            pi_sim_path=pi_sim_path,
-            dt=dt,
-            seed=seed,
-            domain_dim=domain_dim,
-            velocity_data=velocity_data,
-            vel_scaling_factor=vel_scaling_factor,
-            ssp_space=ssp_space,
-            pathintegrator_output=sim.data[pi_output_p]
-        )
     if plot:
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, subplot_titles=("X", "Y"))
         fig.add_scatter(x=sim.trange(), y=pi_sim_path[:,0], mode='lines', name='sim-x', marker=dict(color='blue'), row=1, col=1)
@@ -49,7 +37,7 @@ def simulate(path: np.ndarray, ssp_space: SSPSpace, dt=0.01, seed=0, neurons=500
         fig.add_scatter(x=sim.trange(), y=pi_sim_path[:,1], mode='lines', name='sim-y', showlegend=False, marker=dict(color='blue'), row=2, col=1)
         fig.add_scatter(x=sim.trange(), y=path[:,1], mode='lines', name='real-y', showlegend=False, marker=dict(color='red'), row=2, col=1)
         fig.show()
-    return sim.data[pi_output_p]
+    return ssp_space, sim.data[pi_output_p]
 
 
 def plot_pi_heatmaps(pi_output: np.ndarray, ssp_space: HexagonalSSPSpace, samples_per_dim=100, num_plots=9, **kwargs):
@@ -77,20 +65,15 @@ def generate_path(T: float, dt: float, domain_dim: int, limit=0.1, radius=1, see
     return path
 
 if __name__ == "__main__":
-    # domain_dim = 2
-    # T = 60
-    # dt = 0.001
-    # ssp_space = HexagonalSSPSpace(domain_dim, 256)
-    # path = generate_path(T, dt, domain_dim)
-    # pi_out = simulate(path, ssp_space, dt)
-
-    prev = np.load('pathintegration.npz', allow_pickle=True)
-    pi_out = prev['pathintegrator_output']
-    ssp_space: HexagonalSSPSpace = prev['ssp_space'].item()
+    domain_dim = 2
+    T = 20
+    dt = 0.001
+    length_scale = .5
+    path = generate_path(T, dt, domain_dim)
+    ssp_space, pi_out = simulate(path, dt, length_scale=length_scale)
     plot_pi_heatmaps(pi_out, ssp_space, normalize=True)
 
-    # trange = prev['dt'] * np.arange(pi_out.shape[0])
-    # path = prev['path']
+    # trange = np.arange(0, T, dt)
     # pi_sim_path = ssp_space.decode(pi_out, 'from-set','grid', num_samples=100)
     # fig = make_subplots(rows=2, cols=1, shared_xaxes=True, subplot_titles=("X", "Y"))
     # fig.add_scatter(x=trange, y=pi_sim_path[:,0], mode='lines', name='sim-x', marker=dict(color='blue'), row=1, col=1)

@@ -32,25 +32,33 @@
 
 
 # Questions
-1. How is the associative memory being used? Can the given landmark map be wrong, and the memory corrects it?
-2. How are landmarks being identified? How does the model know that landmark A is not landmark B?
+1. How are landmarks being identified? How does the model know that landmark A is not landmark B?
    - The index of the closest landmark is immediately given to the network as `landmark_id_input` (which directly corresponds to the function `landmark_id_func`)
-3. Why is velocity the input? Shouldn't it be acceleration?
+2. Why is velocity the input? Shouldn't it be acceleration?
    - Velocity exists in the brain
-4. Can the agent rotate? Or only move translationally?
+3. Can the agent rotate? Or only move translationally?
    - State is x & y, nothing else
-5. Whats the point of cleanup?
-   - Smooths PI output using grid cells
-6. Inuitive understanding of SSP Space?
-
-7. Cosine similarity already has diffusion. Should I use a different distance metric?
-
-### Output
-7. In `run_slam`, why is the path integrator so bad? It seems like the localization is entirely due to landmark corrections. It's better in lone PI trial.
-8. In `slam_vs_pi_trials`, PI overshoots but also has sharp discontinuities. Why?
+4. Whats the point of cleanup?
+   - Smooths PI output to snap to grid
+5. In `run_slam`, why is the path integrator so bad? It's better in lone PI trial.
+6. In `slam_vs_pi_trials`, PI overshoots but also has sharp discontinuities. Why?
    - Decoding maps the same pointer to an infinite number of x, y values.
-9.  Both SLAM and PI update pretty infrequently. How would I increase the resolution?
+7.  Both SLAM and PI update pretty infrequently. How would I increase the resolution?
    - Byproduct of decoding. Change `num_samples` in `SSPSpace.decode`
+
+
+## For Furlong
+1. Cosine similarity already has diffusion. Should I use a different distance metric? Or train something that interprets the cosine similarity grid to extract covariance?
+   - Set length scale to make the output much more precise
+   - Square and normalize distribution to get pdf
+   - Calculate covariance matrix of nonnormal pdf
+2. Order of operations
+    - OG:                 f(x2) = f(x1) + f(dx)
+    - noise, encode, sum: f(x2) = f(x1) + SUM f(dxi)
+    - encode, noise, sum: f(x2) = f(x1) + SUM f(dx)i
+3. Should averaging be done using `transform` or `function`? Is there value in the approximation?
+4. `nengo.Neuron`: Is the base model simply using a tuning curve to calculate fire rates? What happens when you use other models?
+
 
 
 # Project Plan

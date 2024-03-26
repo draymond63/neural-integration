@@ -1,7 +1,7 @@
 import numpy as np
 from logging import getLogger
-from scipy.stats import multivariate_normal
 
+import pdf
 from utils import plot_heatmaps, plot_bounded_path, get_sample_spacing
 
 
@@ -82,10 +82,6 @@ def get_map_space(positions: np.ndarray, ppm=1, padding=0.1):
     ys = np.linspace(min_dims[1], max_dims[1], points[1])
     return xs, ys
 
-def gaussian_2d(xs, ys, mean, cov):
-    rv = multivariate_normal(mean, cov)
-    x, y = np.meshgrid(xs, ys)
-    return np.array([[rv.pdf([x, y]) for x in xs] for y in ys])
 
 def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, bounds=None, ppm=30, num_plots=9, **kwargs):
     t_spacing = get_sample_spacing(positions, num_plots)
@@ -96,7 +92,7 @@ def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, bounds=
     else:
         delta = bounds[1] - bounds[0]
         xs, ys = np.linspace(bounds[0], bounds[1], delta*ppm), np.linspace(bounds[0], bounds[1], delta*ppm)
-    dists = np.array([gaussian_2d(xs, ys, pos, cov) for pos, cov in zip(p, c)])
+    dists = np.array([pdf.gaussian2d(xs, ys, pos, cov) for pos, cov in zip(p, c)])
     zmax = np.max(dists, axis=None)
     dists /= zmax
     plot_heatmaps(xs, ys, dists, num_plots, **kwargs)
