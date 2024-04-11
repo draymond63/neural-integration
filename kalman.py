@@ -2,7 +2,7 @@ import numpy as np
 from logging import getLogger
 
 import pdf
-from utils import plot_heatmaps, plot_bounded_path, get_sample_spacing
+from utils import plot_heatmaps, plot_bounded_path, get_sample_spacing, generate_path
 
 
 class Agent:
@@ -58,19 +58,6 @@ def simulate(path: np.ndarray, dt=0.01, noise=1e-5):
     return timestamps, positions, covariances
 
 
-
-def generate_path(n_steps, domain_dim, smoothing_window=200):
-    """Generate a random continuous path in 2D space"""
-    path = np.cumsum(np.random.randn(n_steps, domain_dim), axis=0)
-    smoothing_window = min(smoothing_window, n_steps)
-    window = np.hanning(smoothing_window)
-    path[:, 0] = np.convolve(path[:, 0], window, mode='same')
-    path[:, 1] = np.convolve(path[:, 1], window, mode='same')
-    path = 2 * path / np.max(np.abs(path), axis=0)
-    path -= path[0]
-    return path
-
-
 def get_map_space(positions: np.ndarray, ppm=1, padding=0.1):
     """Returns 2x2 array of maps"""
     max_dims = np.max(positions, axis=0) + 1
@@ -104,4 +91,4 @@ if __name__ == "__main__":
     timestamps, positions, covariances = simulate(path, noise=1e-1)
     stds = np.sqrt(np.diagonal(covariances, axis1=1, axis2=2))
     plot_bounded_path(timestamps, [path, np.zeros((len(path), 2))], [positions, stds])
-    # plot_kalman_heatmaps(positions, covariances)
+    plot_kalman_heatmaps(positions, covariances)

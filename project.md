@@ -52,18 +52,23 @@
    - Set length scale to make the output much more precise
    - Square and normalize distribution to get pdf
    - Calculate covariance matrix of nonnormal pdf
+
 2. Order of operations
-    - OG:                 f(x2) = f(x1) + f(dx)
-    - noise, encode, sum: f(x2) = f(x1) + SUM f(dxi)
-    - encode, noise, sum: f(x2) = f(x1) + SUM f(dx)i
+   - noise, encode, sum: f(x2) = f(x1) * SUM f(dxi)
+
 3. Should averaging be done using `transform` or `function`? Is there value in the approximation?
 4. `nengo.Neuron`: Is the base model simply using a tuning curve to calculate fire rates? What happens when you use other models?
-
-
+5. Summation post-encoding but pre-log?
+6. Code does log of Fourier (`ssp_space, ln 225`), but math should be Fourier of log?
 
 # Project Plan
 Compare Kalman filter to neural path integration
  - Add uncertainty integration to SSP encoding
+ - \phi(x_{t+1}) = \phi(x_t) \circledast [\phi(x_t) + log(\sum_{j}^{n}\phi(\dot{x}_{t,j}))]
+ - \phi(x_{t+1}) = F^{-1}\{F\{\phi(x_t)\} \cdot [F\{\phi(x_t)\} + F\{log(\sum_{j}^{n}\phi(\Delta x_{t,j}))\}]\}
+
+ - \phi(x_{t+1}) = F^{-1}\{\phi_F(x_t) \cdot [\phi_F(x_t) + \Delta x_tA_F]\}
+ - A_F = Re\{log(F\{I\})\}
 
 
 # Ideas
