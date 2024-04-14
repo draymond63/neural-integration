@@ -33,7 +33,7 @@ def plot_ssp_heatmaps(xs, ys, similarities: np.ndarray, num_plots=9, **kwargs):
     plot_heatmaps(xs, ys, plotted_sims, num_plots=len(plotted_sims), **kwargs)
 
 
-def get_similarity_map(xs, ys, ssps: np.ndarray, ssp_space: HexagonalSSPSpace):
+def get_similarity_map(xs, ys, ssps: np.ndarray, ssp_space: HexagonalSSPSpace, rescale=True):
     points = pdf.mesh(xs, ys)
     ssp_grid = ssp_space.encode(points) # (timesteps, ssp_dim)
     pi_norms = np.linalg.norm(ssps, axis=1)[:, np.newaxis]
@@ -41,6 +41,10 @@ def get_similarity_map(xs, ys, ssps: np.ndarray, ssp_space: HexagonalSSPSpace):
     # Cosine similarity between encoded grid points and pi output (since both are unit vectors)
     similarities = ssp_grid @ ssp_output.T # (len(xs)*len(ys))**domain_dim, timesteps)
     similarities = similarities.reshape(len(xs), len(ys), -1).transpose(2,0,1) # (timesteps, len(xs), len(ys))
+    # Cosine similarity is in [-1, 1], so we rescale to [0, 1]
+    if rescale:
+        similarities += 1
+        similarities /= 2
     return similarities
 
 

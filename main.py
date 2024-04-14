@@ -11,7 +11,7 @@ if __name__ == "__main__":
     np.random.seed(0)
     log = getLogger(__name__)
     T = 10
-    dt = 0.001
+    dt = 0.01
     ssp_args = {'length_scale': 0.1}
 
     n_steps = int(T/dt)
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     encoder, ssps = ssp_simulate(path, **ssp_args)
     k_pos, k_cov = kalman_simulate(path, dt)
 
-    xs, ys = get_bounded_space(bounds, ppm=30)
+    xs, ys = get_bounded_space(bounds, ppm=30, padding=2)
     similarities = get_similarity_map(xs, ys, ssps, encoder)
     plot_ssp_heatmaps(xs, ys, similarities, normalize=True)
     plot_kalman_heatmaps(xs, ys, k_pos, k_cov)

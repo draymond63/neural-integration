@@ -12,7 +12,8 @@ def gaussian2d(x: np.ndarray, y: np.ndarray, mean: np.ndarray, cov: np.ndarray) 
 
 def get_cov(x: np.ndarray, y: np.ndarray, pdf: np.ndarray):
     """
-    Calculate the covariance matrix of a domain given a pdf, of shape (domain_dim, domain_dim).
+    Calculate the covariance matrix of shape (domain_dim, domain_dim) for a given a pdf,
+    of shape (len(x)*len(y),). Currently, only supports 2D domains.
 
     Parameters
     ----------
@@ -27,6 +28,8 @@ def get_cov(x: np.ndarray, y: np.ndarray, pdf: np.ndarray):
     Variance of x = E[x^2] - E[x]^2 = Σ[ x^2 * p(x) ] - (E[x])^2
     Covariance of x and y = E[xy] - E[x]E[y] = ΣΣ[ xy * p(x,y) ] - E[x]E[y]
     """
+    assert pdf.shape == (len(x) * len(y),), f"pdf must be of shape ({len(x)*len(y)},), not {pdf.shape}"
+    assert np.all(pdf >= 0), "pdf must be non-negative"
     npdf = pdf / np.sum(pdf)
     domain = mesh(x, y)
     dim = domain.shape[1]
@@ -44,25 +47,27 @@ def get_covs(x: np.ndarray, y: np.ndarray, pdfs: np.ndarray) -> np.ndarray:
 
 def get_stds(covs: np.ndarray) -> np.ndarray:
     assert len(covs.shape) == 3, "covariances must be of shape (n_samples, 2, 2)"
-    # TODO: Why are some variances negative?
-    neg_covs = covs < 0
-    if np.any(neg_covs):
-        print(f"Negative covariances: {np.sum(neg_covs)}")
-    covs[neg_covs] = 0
-    return np.sqrt(np.diagonal(covs, axis1=1, axis2=2))
+    vars = np.copy(np.diagonal(covs, axis1=1, axis2=2))
+    assert np.all(vars >= 0), "Variances must be non-negative"
+    return np.sqrt(vars)
 
 
 def test_covariance(plot=False):
-    x = np.linspace(-10, 10, 20)
-    y = np.linspace(-10, 10, 20)
-    mean = np.array([1, 2])
+    x = np.linspace(-10, 10, 100)
+    y = np.linspace(-10, 10, 100)
+    mean = np.array([-1, 2])
     # cov = np.eye(2)
-    cov = np.array([[3, 0], [0, 2]])
+    cov = np.array([[5, -5], [-5, 6]])
     pdf = gaussian2d(x, y, mean, cov).reshape(-1)
     if plot:
         go.Figure(data=go.Heatmap(x=x, y=y, z=pdf)).show()
-    print(x.shape, y.shape, pdf.shape)
-    print(np.round(get_cov(x, y, pdf), 4))
+    calc_cov = get_cov(x, y, pdf)
+    assert np.allclose(calc_cov, cov, atol=0.1), f"Covariance calculation failed, got {calc_cov}"
+
+    pdf = np.random.randn(len(x) * len(y)) * 0.1
+    pdf -= np.min(pdf)
+    cov = get_cov(x, y, pdf)
+    assert np.all(np.diag(cov) > 0), "Variances matrix must be positive"
 
 
 def mesh(*ranges: np.ndarray) -> np.ndarray:
