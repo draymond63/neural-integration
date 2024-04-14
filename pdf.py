@@ -45,7 +45,10 @@ def get_covs(x: np.ndarray, y: np.ndarray, pdfs: np.ndarray) -> np.ndarray:
 def get_stds(covs: np.ndarray) -> np.ndarray:
     assert len(covs.shape) == 3, "covariances must be of shape (n_samples, 2, 2)"
     # TODO: Why are some variances negative?
-    covs[covs < 0] = 0
+    neg_covs = covs < 0
+    if np.any(neg_covs):
+        print(f"Negative covariances: {np.sum(neg_covs)}")
+    covs[neg_covs] = 0
     return np.sqrt(np.diagonal(covs, axis1=1, axis2=2))
 
 

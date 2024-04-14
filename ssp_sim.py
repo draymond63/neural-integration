@@ -1,21 +1,26 @@
 import numpy as np
 
 from encoders import HexagonalSSPSpace
-from decoders import train_decoder_net_sk, SSPDecoder
+from decoders import train_decoder_net_sk, train_decoder_net_tf, SSPDecoder
 from utils import generate_path, get_sample_spacing, plot_heatmaps, plot_bounded_path, memory, get_path_bounds, get_bounded_space
 import pdf
 
 
-def simulate(path, **kwargs):
+def simulate(path, noise_std=0.01, noise_pts=200, **kwargs):
     num_timesteps = len(path)
     deltas = np.diff(path, axis=0)
     encoder = HexagonalSSPSpace(domain_dim=2, **kwargs)
 
+    if noise_std == 0:
+        noise_pts = 1
+    noise_dist = np.random.randn(noise_pts, 2) * noise_std
+
     x_t = encoder.encode(path[:1])
     ssps = [np.copy(x_t)]
     for i in range(num_timesteps - 1):
-        dx, dy = deltas[i]
-        dx_ssp = encoder.encode([[dx,dy]])
+        delta = deltas[i]
+        noisy_delta = delta + noise_dist
+        dx_ssp = np.mean(encoder.encode(noisy_delta), axis=0, keepdims=True)
         x_t = x_t * dx_ssp
         ssps.append(x_t)
     ssps = np.array(ssps).squeeze()
@@ -40,14 +45,17 @@ def get_similarity_map(xs, ys, ssps: np.ndarray, ssp_space: HexagonalSSPSpace):
 
 
 @memory.cache
-def get_decoder(bounds: np.ndarray, **encoder_kwargs) -> SSPDecoder:
+def get_decoder(bounds: np.ndarray, tf=True, **encoder_kwargs) -> SSPDecoder:
     ssp_space = HexagonalSSPSpace(domain_dim=2, **encoder_kwargs)
-    decoder, hist = train_decoder_net_sk(ssp_space, bounds=bounds)
+    if tf:
+        decoder, hist = train_decoder_net_tf(ssp_space, bounds=bounds)
+    else:
+        decoder, hist = train_decoder_net_sk(ssp_space, bounds=bounds)
     return decoder
 
 
-def decode_ssps(ssps: np.ndarray, bounds: np.ndarray, **encoder_kwargs):
-    decoder = get_decoder(bounds, **encoder_kwargs)
+def decode_ssps(ssps: np.ndarray, bounds: np.ndarray, **kwargs):
+    decoder = get_decoder(bounds, **kwargs)
     decoded = decoder.decode(ssps)
     return decoded
 
@@ -61,7 +69,7 @@ if __name__ == "__main__":
     path = generate_path(2000, 2)
     bounds = get_path_bounds(path)
     encoder, ssps = simulate(path, length_scale=length_scale)
-    xs, ys = get_bounded_space(bounds, ppm=30)
+    xs, ys = get_bounded_space(bounds, ppm=30, padding=2)
     similarities = get_similarity_map(xs, ys, ssps, encoder)
     plot_ssp_heatmaps(xs, ys, similarities, normalize=True)
 
