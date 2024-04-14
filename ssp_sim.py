@@ -6,7 +6,7 @@ from utils import generate_path, get_sample_spacing, plot_heatmaps, plot_bounded
 import pdf
 
 
-def simulate(path, noise_std=0.01, noise_pts=200, **kwargs):
+def simulate(path, noise_std=0.003, noise_pts=1000, **kwargs):
     num_timesteps = len(path)
     deltas = np.diff(path, axis=0)
     encoder = HexagonalSSPSpace(domain_dim=2, **kwargs)
@@ -48,6 +48,13 @@ def get_similarity_map(xs, ys, ssps: np.ndarray, ssp_space: HexagonalSSPSpace, r
     return similarities
 
 
+def get_ssp_var(similarities: np.ndarray):
+    stds = pdf.edge_sharpness(similarities)
+    stds -= np.min(stds)
+    stds = np.vstack([stds, stds]).T
+    return stds
+
+
 @memory.cache
 def get_decoder(bounds: np.ndarray, tf=True, **encoder_kwargs) -> SSPDecoder:
     ssp_space = HexagonalSSPSpace(domain_dim=2, **encoder_kwargs)
@@ -79,9 +86,12 @@ if __name__ == "__main__":
 
     decoded_path = decode_ssps(ssps, bounds, length_scale=length_scale)
     timestamps = np.linspace(0, T, num_steps)
-    stds = pdf.get_stds(pdf.get_covs(xs, ys, similarities.reshape(len(similarities), -1)))
+    stds = get_ssp_var(similarities)
+
     plot_bounded_path(
         timestamps,
-        [path, np.zeros((len(path), 2))],
-        [decoded_path, stds],
+        paths={
+            'Truth': [path, np.zeros((len(path), 2))],
+            'SSP': [decoded_path, stds],
+        }
     )

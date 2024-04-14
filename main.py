@@ -4,7 +4,7 @@ from logging import getLogger
 import pdf
 from utils import plot_bounded_path, generate_path, get_path_bounds, get_bounded_space
 from kalman import simulate as kalman_simulate, plot_kalman_heatmaps
-from ssp_sim import simulate as ssp_simulate, get_similarity_map, plot_ssp_heatmaps, decode_ssps
+from ssp_sim import simulate as ssp_simulate, get_similarity_map, plot_ssp_heatmaps, decode_ssps, get_ssp_var
 
 
 if __name__ == "__main__":
@@ -23,16 +23,18 @@ if __name__ == "__main__":
 
     xs, ys = get_bounded_space(bounds, ppm=30, padding=2)
     similarities = get_similarity_map(xs, ys, ssps, encoder)
-    plot_ssp_heatmaps(xs, ys, similarities, normalize=True)
     plot_kalman_heatmaps(xs, ys, k_pos, k_cov)
+    plot_ssp_heatmaps(xs, ys, similarities, normalize=True)
 
     log.info("Decoding...")
     ssp_pos = decode_ssps(ssps, bounds, **ssp_args)
-    ssp_covs = pdf.get_covs(xs, ys, similarities.reshape(len(similarities), -1))
+    ssps_vars = get_ssp_var(similarities)
     timestamps = np.linspace(0, T, n_steps)
     plot_bounded_path(
         timestamps,
-        [path, np.zeros((len(path), 2))],
-        [k_pos, pdf.get_stds(k_cov)],
-        [ssp_pos, pdf.get_stds(ssp_covs)],
+        paths={
+            'Truth': [path, np.zeros((len(path), 2))],
+            'Kalman': [k_pos, pdf.get_stds(k_cov)],
+            'SSP': [ssp_pos, ssps_vars],
+        }
     )

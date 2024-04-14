@@ -81,4 +81,10 @@ if __name__ == "__main__":
 
     stds = np.sqrt(np.diagonal(covariances, axis1=1, axis2=2))
     timestamps = np.linspace(0, T, num_steps)
-    plot_bounded_path(timestamps, [path, np.zeros((len(path), 2))], [positions, stds])
+    plot_bounded_path(
+        timestamps,
+        paths={
+            'Truth', [path, np.zeros((len(path), 2))],
+            'Kalman', [positions, stds]
+        }
+    )

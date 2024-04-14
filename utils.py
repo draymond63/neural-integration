@@ -1,16 +1,18 @@
 import numpy as np
 from scipy.stats import qmc
 from plotly.subplots import make_subplots
-from typing import Tuple
+from typing import Tuple, Dict
 from joblib import Memory
 
 
 memory = Memory(location='cache', verbose=0)
 
 
-def plot_heatmaps(x, y, zs, num_plots=9, normalize=False):
+def plot_heatmaps(x, y, zs, num_plots=9, normalize=False, offset=True):
     cols = int(np.ceil(np.sqrt(num_plots)))
     rows = int(np.ceil(num_plots / cols))
+    if offset:
+        zs = np.copy(zs - np.min(zs))
     fig = make_subplots(rows=rows, cols=cols)
     for i in range(num_plots):
         fig.add_heatmap(
@@ -67,20 +69,20 @@ def plot_path(ts: float, *paths: np.ndarray):
     fig.show()
 
 
-def plot_bounded_path(ts: np.ndarray, *paths: Tuple[np.ndarray, np.ndarray]):
+def plot_bounded_path(ts: np.ndarray, paths: Dict[str, Tuple[np.ndarray, np.ndarray]]):
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1)
     dims = ['x', 'y']
     colors = ['blue', 'red', 'green', 'purple', 'orange']
     bound_params = dict(line=dict(dash='dash'), showlegend=False, mode='lines', col=1)
 
-    for idx, (path, stdevs) in enumerate(paths):
+    for idx, (name, (path, stdevs)) in enumerate(paths.items()):
         design_params = dict(mode='lines', showlegend=len(paths) > 1, col=1)
         design_params['marker'] = dict(color=colors[idx])
         bound_params['marker'] = dict(color=colors[idx])
         for dim, dim_label in enumerate(dims):
             design_params['row'] = dim + 1
             bound_params['row'] = dim + 1
-            fig.add_scatter(x=ts, y=path[:,dim], name=f"Path {idx}", **design_params)
+            fig.add_scatter(x=ts, y=path[:,dim], name=name, **design_params)
             fig.add_scatter(x=ts, y=path[:,dim] + stdevs[:,dim], **bound_params)
             fig.add_scatter(x=ts, y=path[:,dim] - stdevs[:,dim], **bound_params)
             design_params['showlegend'] = False
@@ -101,8 +103,10 @@ def sample_domain_rng(bounds, num_samples):
     return sample_points
 
 
-def get_path_bounds(path: np.ndarray):
-    return np.array([np.min(path, axis=0), np.max(path, axis=0)]).T
+def get_path_bounds(path: np.ndarray, decimals=1):
+    bounds = np.array([np.min(path, axis=0), np.max(path, axis=0)]).T
+    bounds = np.round(bounds, decimals=decimals)
+    return bounds
 
 def get_bounded_space(bounds: np.ndarray, ppm=1, padding=0.1):
     """Returns 2x2 array of maps"""
