@@ -7,7 +7,7 @@ from scipy.stats import multivariate_normal
 def gaussian2d(x: np.ndarray, y: np.ndarray, mean: np.ndarray, cov: np.ndarray) -> np.ndarray:
     rv = multivariate_normal(mean, cov)
     domain = np.array(np.meshgrid(x, y)).T.reshape(-1, 2)
-    return rv.pdf(domain)
+    return rv.pdf(domain).reshape(len(x), len(y))
 
 
 def get_cov(x: np.ndarray, y: np.ndarray, pdf: np.ndarray):

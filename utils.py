@@ -1,29 +1,8 @@
 import numpy as np
-import scipy 
 from scipy.stats import qmc
-from joblib import Memory
 from plotly.subplots import make_subplots
 from typing import Tuple
 
-
-memoize = Memory(location='cache', verbose=0)
-
-
-def sparsity_to_x_intercept(d, p):
-    sign = 1
-    if p > 0.5:
-        p = 1.0 - p
-        sign = -1
-    return sign * np.sqrt(1-scipy.special.betaincinv((d-1)/2.0, 0.5, 2*p))
-
-
-def get_velocity_scale_factor(velocity_data: np.ndarray, ssp_space, dt: float):
-    pathlen = velocity_data.shape[0]
-    real_freqs = (ssp_space.phase_matrix @ velocity_data.T)
-    vel_scaling_factor = 1/np.max(np.abs(real_freqs))
-    vels_scaled = velocity_data*vel_scaling_factor
-    velocity_func = lambda t: vels_scaled[int(np.minimum(np.floor(t/dt), pathlen-2))]
-    return velocity_func, vel_scaling_factor
 
 
 def plot_heatmaps(x, y, zs, num_plots=9, normalize=False):
@@ -59,6 +38,10 @@ def generate_path(n_steps, domain_dim, smoothing_window=200):
     path = 2 * path / np.max(np.abs(path), axis=0)
     path -= path[0]
     return path
+
+
+def get_path_bounds(path: np.ndarray):
+    return np.array([np.min(path, axis=0), np.max(path, axis=0)]).T
 
 
 def plot_path(ts: float, *paths: np.ndarray):
@@ -117,10 +100,10 @@ def sample_domain(bounds, num_samples):
 
 def sample_domain_grid(bounds, samples_per_dim=100):
     domain_dim = bounds.shape[0]
-    xxs = np.meshgrid(*[np.linspace(bounds[i,0], bounds[i,1], samples_per_dim) for i in range(domain_dim)])
-    retval = np.array([x.reshape(-1) for x in xxs]).T
-    assert retval.shape[1] == domain_dim, f'Expected {domain_dim}d data, got {retval.shape[1]}d data'
-    return retval
+    xs = [np.linspace(lb, ub, samples_per_dim) for lb, ub in bounds]
+    xxs = np.array(np.meshgrid(*xs)).T.reshape(-1, domain_dim)
+    assert xxs.shape[1] == domain_dim, f'Expected {domain_dim}d data, got {xxs.shape[1]}d data'
+    return xxs
 
 
 def make_good_unitary(dim, eps=1e-3, rng=np.random, mul=1):

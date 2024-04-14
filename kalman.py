@@ -90,5 +90,5 @@ if __name__ == "__main__":
     path = generate_path(1000, 2)
     timestamps, positions, covariances = simulate(path, noise=1e-1)
     stds = np.sqrt(np.diagonal(covariances, axis1=1, axis2=2))
-    plot_bounded_path(timestamps, [path, np.zeros((len(path), 2))], [positions, stds])
+    # plot_bounded_path(timestamps, [path, np.zeros((len(path), 2))], [positions, stds])
     plot_kalman_heatmaps(positions, covariances)
