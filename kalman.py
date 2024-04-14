@@ -38,7 +38,6 @@ class Agent:
 def simulate(path: np.ndarray, dt=0.01, noise=1e-5):
     log = getLogger(__name__)
     log.info("Starting Kalman simulation...")
-    timestamps = np.linspace(0, len(path) * dt, len(path))
     vels = np.diff(path, axis=0) / dt
     if noise:
         vels += np.random.randn(*vels.shape) * noise
@@ -55,7 +54,7 @@ def simulate(path: np.ndarray, dt=0.01, noise=1e-5):
         covariances[i] = agent.get_pos_cov()
         agent.update(vels[i-1])
     log.info("Kalman simulation complete")
-    return timestamps, positions, covariances
+    return positions, covariances
 
 
 def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, bounds=None, ppm=30, num_plots=9, **kwargs):
@@ -68,13 +67,18 @@ def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, bounds=
     dists = np.array([pdf.gaussian2d(xs, ys, pos, cov) for pos, cov in zip(p, c)])
     zmax = np.max(dists, axis=None)
     dists /= zmax
-    plot_heatmaps(xs, ys, dists, num_plots, **kwargs)
+    plot_heatmaps(xs, ys, dists, len(dists), **kwargs)
 
 
 if __name__ == "__main__":
     np.random.seed(0)
-    path = generate_path(1000, 2)
-    timestamps, positions, covariances = simulate(path, noise=1e-1)
+    T = 10
+    dt = 0.01
+    num_steps = int(T / dt)
+    path = generate_path(num_steps, 2)
+    positions, covariances = simulate(path, dt=dt, noise=1e-1)
+
     stds = np.sqrt(np.diagonal(covariances, axis1=1, axis2=2))
+    timestamps = np.linspace(0, T, num_steps)
     plot_bounded_path(timestamps, [path, np.zeros((len(path), 2))], [positions, stds])
     plot_kalman_heatmaps(positions, covariances)
