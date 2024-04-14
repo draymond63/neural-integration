@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
 
-from utils import sample_domain
+from utils import sample_domain_rng
 
 
 class SSPDecoder:
@@ -85,7 +85,7 @@ def train_decoder_net_sk(encoder, bounds, n_training_pts = 200000,
 
     print('Generating training examples ...')
     if sample_points is None:
-        sample_points = sample_domain(bounds, n_training_pts)
+        sample_points = sample_domain_rng(bounds, n_training_pts)
         print(sample_points.shape)
     sample_ssps = encoder.encode(sample_points)
     
@@ -138,7 +138,7 @@ def train_decoder_net_tf(encoder, bounds, n_training_pts=200000,
             optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
             loss='mean_squared_error')
 
-    sample_points = sample_domain(bounds, n_training_pts)
+    sample_points = sample_domain_rng(bounds, n_training_pts)
     sample_ssps = encoder.encode(sample_points)
 
     shuffled_ssps, shuffled_pts = sklearn.utils.shuffle(sample_ssps, sample_points)

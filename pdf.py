@@ -6,7 +6,7 @@ from scipy.stats import multivariate_normal
 
 def gaussian2d(x: np.ndarray, y: np.ndarray, mean: np.ndarray, cov: np.ndarray) -> np.ndarray:
     rv = multivariate_normal(mean, cov)
-    domain = np.array(np.meshgrid(x, y)).T.reshape(-1, 2)
+    domain = mesh(x, y)
     return rv.pdf(domain).reshape(len(x), len(y))
 
 
@@ -28,7 +28,7 @@ def get_cov(x: np.ndarray, y: np.ndarray, pdf: np.ndarray):
     Covariance of x and y = E[xy] - E[x]E[y] = ΣΣ[ xy * p(x,y) ] - E[x]E[y]
     """
     npdf = pdf / np.sum(pdf)
-    domain = np.array(np.meshgrid(x, y)).T.reshape(-1, 2)
+    domain = mesh(x, y)
     dim = domain.shape[1]
     cov = np.zeros((dim, dim))
     for i in range(dim):
@@ -49,6 +49,10 @@ def test_covariance(plot=False):
     if plot:
         go.Figure(data=go.Heatmap(x=x, y=y, z=pdf)).show()
     print(np.round(get_cov(x, y, pdf), 4))
+
+
+def mesh(*ranges: np.ndarray) -> np.ndarray:
+    return np.array(np.meshgrid(*ranges)).T.reshape(-1, len(ranges))
 
 
 if __name__ == "__main__":

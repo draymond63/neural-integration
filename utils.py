@@ -2,7 +2,10 @@ import numpy as np
 from scipy.stats import qmc
 from plotly.subplots import make_subplots
 from typing import Tuple
+from joblib import Memory
 
+
+memory = Memory(location='cache', verbose=0)
 
 
 def plot_heatmaps(x, y, zs, num_plots=9, normalize=False):
@@ -18,7 +21,7 @@ def plot_heatmaps(x, y, zs, num_plots=9, normalize=False):
             row=i//cols+1,
             col=i%cols+1,
             zmax=1 if normalize else None,
-            showscale=normalize,
+            showscale=False,
         )
     fig.update_layout(showlegend=False)
     fig.show()
@@ -89,7 +92,7 @@ def plot_bounded_path(ts: np.ndarray, *paths: Tuple[np.ndarray, np.ndarray]):
 
 
 
-def sample_domain(bounds, num_samples):
+def sample_domain_rng(bounds, num_samples):
     sampler = qmc.Sobol(d=bounds.shape[0]) 
     lbounds = bounds[:,0]
     ubounds = bounds[:,1]
@@ -98,17 +101,10 @@ def sample_domain(bounds, num_samples):
     return sample_points
 
 
-def sample_domain_grid(bounds, samples_per_dim=100):
-    domain_dim = bounds.shape[0]
-    xs = [np.linspace(lb, ub, samples_per_dim) for lb, ub in bounds]
-    xxs = np.array(np.meshgrid(*xs)).T.reshape(-1, domain_dim)
-    assert xxs.shape[1] == domain_dim, f'Expected {domain_dim}d data, got {xxs.shape[1]}d data'
-    return xxs
-
 def get_path_bounds(path: np.ndarray):
     return np.array([np.min(path, axis=0), np.max(path, axis=0)]).T
 
-def get_bounded_space(bounds: np.ndarray, ppm=1, padding=0.5):
+def get_bounded_space(bounds: np.ndarray, ppm=1, padding=0.1):
     """Returns 2x2 array of maps"""
     assert bounds.shape[0] == 2
     delta = bounds[:,1] - bounds[:,0]
