@@ -2,7 +2,7 @@ import numpy as np
 from logging import getLogger
 
 import pdf
-from utils import plot_heatmaps, plot_bounded_path, get_sample_spacing, generate_path
+from utils import plot_heatmaps, plot_bounded_path, get_sample_spacing, generate_path, get_bounded_space, get_path_bounds
 
 
 class Agent:
@@ -58,27 +58,13 @@ def simulate(path: np.ndarray, dt=0.01, noise=1e-5):
     return timestamps, positions, covariances
 
 
-def get_map_space(positions: np.ndarray, ppm=1, padding=0.1):
-    """Returns 2x2 array of maps"""
-    max_dims = np.max(positions, axis=0) + 1
-    min_dims = np.min(positions, axis=0)
-    delta = max_dims - min_dims
-    delta += delta * padding
-    points = (delta * ppm).astype(int)
-    xs = np.linspace(min_dims[0], max_dims[0], points[0])
-    ys = np.linspace(min_dims[1], max_dims[1], points[1])
-    return xs, ys
-
-
 def plot_kalman_heatmaps(positions: np.ndarray, covariances: np.ndarray, bounds=None, ppm=30, num_plots=9, **kwargs):
     t_spacing = get_sample_spacing(positions, num_plots)
     p = positions[::t_spacing]
     c = covariances[::t_spacing]
     if bounds is None:
-        xs, ys = get_map_space(positions, ppm)
-    else:
-        delta = bounds[1] - bounds[0]
-        xs, ys = np.linspace(bounds[0], bounds[1], delta*ppm), np.linspace(bounds[0], bounds[1], delta*ppm)
+        bounds = get_path_bounds(positions)
+    xs, ys = get_bounded_space(bounds, ppm)
     dists = np.array([pdf.gaussian2d(xs, ys, pos, cov) for pos, cov in zip(p, c)])
     zmax = np.max(dists, axis=None)
     dists /= zmax
@@ -90,5 +76,5 @@ if __name__ == "__main__":
     path = generate_path(1000, 2)
     timestamps, positions, covariances = simulate(path, noise=1e-1)
     stds = np.sqrt(np.diagonal(covariances, axis1=1, axis2=2))
-    # plot_bounded_path(timestamps, [path, np.zeros((len(path), 2))], [positions, stds])
+    plot_bounded_path(timestamps, [path, np.zeros((len(path), 2))], [positions, stds])
     plot_kalman_heatmaps(positions, covariances)

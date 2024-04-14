@@ -105,6 +105,17 @@ def sample_domain_grid(bounds, samples_per_dim=100):
     assert xxs.shape[1] == domain_dim, f'Expected {domain_dim}d data, got {xxs.shape[1]}d data'
     return xxs
 
+def get_path_bounds(path: np.ndarray):
+    return np.array([np.min(path, axis=0), np.max(path, axis=0)]).T
+
+def get_bounded_space(bounds: np.ndarray, ppm=1, padding=0.5):
+    """Returns 2x2 array of maps"""
+    assert bounds.shape[0] == 2
+    delta = bounds[:,1] - bounds[:,0]
+    delta += delta * padding
+    points = (delta * ppm).astype(int)
+    return [np.linspace(lb - padding, ub + padding, p) for (lb, ub), p in zip(bounds, points)]
+
 
 def make_good_unitary(dim, eps=1e-3, rng=np.random, mul=1):
     a = rng.rand((dim - 1) // 2)
