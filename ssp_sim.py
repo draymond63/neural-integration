@@ -2,8 +2,8 @@ import numpy as np
 
 from encoders import HexagonalSSPSpace
 from decoders import train_decoder_net_sk, SSPDecoder
-from utils import generate_path, get_sample_spacing, plot_heatmaps, plot_path, memory, get_path_bounds, get_bounded_space
-from pdf import mesh
+from utils import generate_path, get_sample_spacing, plot_heatmaps, plot_bounded_path, memory, get_path_bounds, get_bounded_space
+import pdf
 
 
 def simulate(path, **kwargs):
@@ -22,18 +22,14 @@ def simulate(path, **kwargs):
     return encoder, ssps
 
 
-def plot_ssp_heatmaps(ssps: np.ndarray, ssp_space: HexagonalSSPSpace, bounds: np.ndarray, ppm=30, num_plots=9, **kwargs):
-    t_spacing = get_sample_spacing(ssps, num_plots)
-    plotted_ssps = ssps[::t_spacing]
-    similarities = get_similarity_map(plotted_ssps, ssp_space, bounds, ppm=ppm)
-    # TODO: Set boundaries properly
-    xs, ys = get_bounded_space(bounds, ppm)
-    plot_heatmaps(xs, ys, similarities, num_plots=len(similarities), **kwargs)
+def plot_ssp_heatmaps(xs, ys, similarities: np.ndarray, num_plots=9, **kwargs):
+    t_spacing = get_sample_spacing(len(similarities), num_plots)
+    plotted_sims = similarities[::t_spacing]
+    plot_heatmaps(xs, ys, plotted_sims, num_plots=len(plotted_sims), **kwargs)
 
 
-def get_similarity_map(ssps: np.ndarray, ssp_space: HexagonalSSPSpace, bounds: np.ndarray, ppm=5):
-    xs, ys = get_bounded_space(bounds, ppm)
-    points = mesh(xs, ys)
+def get_similarity_map(xs, ys, ssps: np.ndarray, ssp_space: HexagonalSSPSpace):
+    points = pdf.mesh(xs, ys)
     ssp_grid = ssp_space.encode(points) # (timesteps, ssp_dim)
     pi_norms = np.linalg.norm(ssps, axis=1)[:, np.newaxis]
     ssp_output = ssps / np.where(pi_norms < 1e-6, 1, pi_norms) # (timesteps, ssp_dim)
@@ -65,7 +61,15 @@ if __name__ == "__main__":
     path = generate_path(2000, 2)
     bounds = get_path_bounds(path)
     encoder, ssps = simulate(path, length_scale=length_scale)
-    plot_ssp_heatmaps(ssps, encoder, bounds, normalize=True)
+    xs, ys = get_bounded_space(bounds, ppm=30)
+    similarities = get_similarity_map(xs, ys, ssps, encoder)
+    plot_ssp_heatmaps(xs, ys, similarities, normalize=True)
 
-    decoded = decode_ssps(ssps, bounds, length_scale=length_scale)
-    plot_path(np.linspace(0, T, num_steps), path, decoded)
+    decoded_path = decode_ssps(ssps, bounds, length_scale=length_scale)
+    timestamps = np.linspace(0, T, num_steps)
+    stds = pdf.get_stds(pdf.get_covs(xs, ys, similarities.reshape(len(similarities), -1)))
+    plot_bounded_path(
+        timestamps,
+        [path, np.zeros((len(path), 2))],
+        [decoded_path, stds],
+    )

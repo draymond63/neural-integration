@@ -38,6 +38,16 @@ def get_cov(x: np.ndarray, y: np.ndarray, pdf: np.ndarray):
     cov -= np.outer(mu, mu)
     return cov
 
+def get_covs(x: np.ndarray, y: np.ndarray, pdfs: np.ndarray) -> np.ndarray:
+    assert len(pdfs.shape) == 2, "pdf must be of shape (n_samples, len(x)*len(y))"
+    return np.array([get_cov(x, y, pdf) for pdf in pdfs])
+
+def get_stds(covs: np.ndarray) -> np.ndarray:
+    assert len(covs.shape) == 3, "covariances must be of shape (n_samples, 2, 2)"
+    # TODO: Why are some variances negative?
+    covs[covs < 0] = 0
+    return np.sqrt(np.diagonal(covs, axis1=1, axis2=2))
+
 
 def test_covariance(plot=False):
     x = np.linspace(-10, 10, 20)
@@ -48,10 +58,17 @@ def test_covariance(plot=False):
     pdf = gaussian2d(x, y, mean, cov).reshape(-1)
     if plot:
         go.Figure(data=go.Heatmap(x=x, y=y, z=pdf)).show()
+    print(x.shape, y.shape, pdf.shape)
     print(np.round(get_cov(x, y, pdf), 4))
 
 
 def mesh(*ranges: np.ndarray) -> np.ndarray:
+    """
+    Generate a meshgrid of points of shape `(len(range1)*len(range2)..., len(ranges))`.
+    Typically, `len(ranges)` is the dimensionality of the domain
+
+    e.g. mesh(x, y) -> [[x0,y0], [x0,y1], [x0,y2], ..., [x1,y0], [x1,y1], ...]
+    """
     return np.array(np.meshgrid(*ranges)).T.reshape(-1, len(ranges))
 
 

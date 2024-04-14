@@ -27,12 +27,12 @@ def plot_heatmaps(x, y, zs, num_plots=9, normalize=False):
     fig.show()
 
 
-def get_sample_spacing(arr: np.ndarray, num_samples: int):
-    return np.ceil(len(arr) / num_samples).astype(int)
+def get_sample_spacing(og_len: int, num_samples: int):
+    return np.ceil(og_len / num_samples).astype(int)
 
 
 def generate_path(n_steps, domain_dim, smoothing_window=200):
-    """Generate a random continuous path in 2D space"""
+    """Generate a random continuous path in 2D space, of shape (n_steps, domain_dim)"""
     path = np.cumsum(np.random.randn(n_steps, domain_dim), axis=0)
     smoothing_window = min(smoothing_window, n_steps)
     window = np.hanning(smoothing_window)
