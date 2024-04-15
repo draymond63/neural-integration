@@ -1,6 +1,6 @@
 numpy
 scipy
-nengo
 plotly
 scikit-learn
 tensorflow
+keras
