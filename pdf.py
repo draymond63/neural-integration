@@ -52,21 +52,6 @@ def get_stds(covs: np.ndarray) -> np.ndarray:
     return np.sqrt(vars)
 
 
-def entropy(pdf: np.ndarray) -> np.ndarray:
-    """
-    Calculate the entropy of multiple given pdfs. Of shape `(n_pdfs, len(pdf))`.
-
-    Calculations
-    ------------
-    H(X) = -Σ[ p(x) * log(p(x)) ]
-    """
-    assert np.all(pdf >= 0), "pdf must be non-negative"
-    npdf = pdf / np.sum(pdf, axis=1, keepdims=True)
-    npdf[npdf == 0] = 1e-15
-    entr = -np.sum(npdf * np.log(npdf), axis=1)
-    return entr
-
-
 def test_covariance(plot=False):
     x = np.linspace(-10, 10, 100)
     y = np.linspace(-10, 10, 100)

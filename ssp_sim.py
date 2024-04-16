@@ -1,21 +1,22 @@
 import os
 import numpy as np
 import tensorflow as tf
+from scipy import stats
 
 from encoders import HexagonalSSPSpace
 from decoders import train_decoder_net_tf, SSPDecoder
-from utils import generate_path, get_sample_spacing, plot_heatmaps, plot_bounded_path, get_path_bounds, get_bounded_space, apply_kernel
+from utils import generate_path, plot_heatmaps, plot_bounded_path, get_path_bounds, get_bounded_space, apply_kernel
 import pdf
 
 
-def simulate(path, noise_std=0.003, noise_pts=1000, **kwargs):
+def simulate(path, noise=0.003, noise_pts=1000, **kwargs):
     num_timesteps = len(path)
     deltas = np.diff(path, axis=0)
     encoder = HexagonalSSPSpace(domain_dim=2, **kwargs)
 
-    if noise_std == 0:
+    if noise == 0:
         noise_pts = 1
-    noise_dist = np.random.randn(noise_pts, 2) * noise_std
+    noise_dist = np.random.randn(noise_pts, 2) * noise
 
     x_t = encoder.encode(path[:1])
     ssps = [np.copy(x_t)]
@@ -44,16 +45,28 @@ def get_similarity_map(xs, ys, ssps: np.ndarray, ssp_space: HexagonalSSPSpace, r
     return similarities
 
 def get_ssp_stds(similarities: np.ndarray):
-    std = np.sqrt(get_ssp_var(similarities))
+    std = np.sqrt(get_ssp_variance(similarities))
     return np.stack([std, std], axis=1)
 
-def get_ssp_var(similarities: np.ndarray):
+def get_ssp_variance(similarities: np.ndarray, method='edge'):
+    """Calculates the estimated variance of the """
+    assert method in ['edge', 'var', 'entropy']
+    if method == 'edge':
+        return get_edge_variance(similarities)
+    elif method == 'var':
+        variance = np.var(similarities, axis=(1, 2))
+        return 430*(variance - variance[0])
+    elif method == 'entropy':
+        entropy = stats.entropy(similarities, axis=(1, 2))
+        return 240*(entropy[0] - entropy)
+
+def get_edge_variance(similarities: np.ndarray):
     kernel = np.array([[0, 1, 0], [-1, 0, 1], [0, -1, 0]])
     edges = apply_kernel(similarities, kernel)
     avg_edge = np.abs(edges).mean(axis=(1, 2))
     return _edge_to_var_transform(avg_edge)
 
-def _edge_to_var_transform(arr, A=0.307165, B=7.271e-08, offset=2.756e-07):
+def _edge_to_var_transform(arr, A=0.11058, B=7.271e-08):
     """Edge strength is logarithmic, but variance is linear. This map is a rough fit to observation."""
     return A*(np.exp((arr[0] - arr)/B) - 1)
 
