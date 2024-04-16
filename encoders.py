@@ -56,9 +56,9 @@ class DiscreteSPSpace:
     def decode(self, ssp):
         return self.keys[np.argmax(self.map | ssp)]
 
-        
+
 class SSPEncoder:
-    def __init__(self, phase_matrix:np.ndarray, length_scale:Optional[Union[int, np.ndarray]]=1):
+    def __init__(self, phase_matrix:np.ndarray, length_scale:Optional[Union[int, np.ndarray]]=.1):
         '''
         Represents a domain using spatial semantic pointers.
 

@@ -1,18 +1,19 @@
 import numpy as np
 from scipy.stats import qmc
+from scipy.signal import convolve2d
 from plotly.subplots import make_subplots
 from typing import Tuple, Dict
-from joblib import Memory
 
 
-memory = Memory(location='cache', verbose=0)
 
-
-def plot_heatmaps(x, y, zs, num_plots=9, normalize=False, offset=True):
+def plot_heatmaps(x, y, zs, num_plots=9, offset=True):
     cols = int(np.ceil(np.sqrt(num_plots)))
     rows = int(np.ceil(num_plots / cols))
+    if len(zs) > num_plots:
+        spacing = get_sample_spacing(len(zs), num_plots)
+        zs = zs[::spacing]
     if offset:
-        zs = np.copy(zs - np.min(zs))
+        zs = zs - np.min(zs)
     fig = make_subplots(rows=rows, cols=cols)
     for i in range(num_plots):
         fig.add_heatmap(
@@ -22,7 +23,7 @@ def plot_heatmaps(x, y, zs, num_plots=9, normalize=False, offset=True):
             zmin=0,
             row=i//cols+1,
             col=i%cols+1,
-            zmax=1 if normalize else None,
+            zmax=None,
             showscale=False,
         )
     fig.update_layout(showlegend=False)
@@ -33,7 +34,7 @@ def get_sample_spacing(og_len: int, num_samples: int):
     return np.ceil(og_len / num_samples).astype(int)
 
 
-def generate_path(n_steps, domain_dim, smoothing_window=200):
+def generate_path(n_steps, domain_dim=2, smoothing_window=200):
     """Generate a random continuous path in 2D space, of shape (n_steps, domain_dim)"""
     path = np.cumsum(np.random.randn(n_steps, domain_dim), axis=0)
     smoothing_window = min(smoothing_window, n_steps)
@@ -115,6 +116,15 @@ def get_bounded_space(bounds: np.ndarray, ppm=1, padding=0.1):
     delta += delta * padding
     points = (delta * ppm).astype(int)
     return [np.linspace(lb - padding, ub + padding, p) for (lb, ub), p in zip(bounds, points)]
+
+
+def apply_kernel(sequence, kernel):
+    res = [None] * sequence.shape[0]
+    for i, f in enumerate(sequence):
+        npdf = f / np.sum(f)
+        res[i] = convolve2d(npdf, kernel, mode='valid')
+    res = np.array(res)
+    return res
 
 
 def make_good_unitary(dim, eps=1e-3, rng=np.random, mul=1):

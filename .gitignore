@@ -1,4 +1,5 @@
 __pycache__
+*.keras
 *.npz
 *.npy
 *.png

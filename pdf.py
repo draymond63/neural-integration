@@ -1,7 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
 from scipy.stats import multivariate_normal
-from scipy.signal import convolve2d
 
 
 
@@ -68,16 +67,6 @@ def entropy(pdf: np.ndarray) -> np.ndarray:
     return entr
 
 
-def edge_sharpness(pdfs):
-    kernel = np.array([[0, 1, 0], [-1, 0, 1], [0, -1, 0]])
-    pdfs2d = np.atleast_2d(pdfs)
-    vars = np.zeros(len(pdfs2d))
-    for i, f in enumerate(pdfs2d):
-        npdf = f / np.sum(f)
-        vars[i] = np.log(1/np.mean(np.abs(convolve2d(npdf, kernel, mode='same'))))
-    return vars
-
-
 def test_covariance(plot=False):
     x = np.linspace(-10, 10, 100)
     y = np.linspace(-10, 10, 100)
@@ -108,23 +97,3 @@ def mesh(*ranges: np.ndarray) -> np.ndarray:
 
 if __name__ == "__main__":
     test_covariance()
-
-    import plotly.graph_objects as go
-    import plotly.express as px
-    vals = np.load("sims.npz")
-    xs, ys, sims = vals['xs'], vals['ys'], vals['similarities']
-    sims -= np.min(sims)
-    stds = get_stds(get_covs(xs, ys, sims.reshape(len(sims), -1)))
-    stds /= np.max(stds, axis=0)
-    entropys = entropy(sims.reshape(len(sims), -1))
-    entropys /= np.max(entropys.reshape(len(sims), -1))
-    ds = edge_sharpness(sims)
-    ds /= np.max(ds)
-
-    stamps = np.arange(len(sims))
-    fig = go.Figure(layout_yaxis_range=[0.5, 1.1])
-    fig.add_trace(go.Scatter(x=stamps, y=stds[:, 0], mode='lines', name='stds X'))
-    fig.add_trace(go.Scatter(x=stamps, y=stds[:, 1], mode='lines', name='stds Y'))
-    fig.add_trace(go.Scatter(x=stamps, y=entropys, mode='lines', name='entropy'))
-    fig.add_trace(go.Scatter(x=stamps, y=ds, mode='lines', name='sharpness'))
-    fig.show()

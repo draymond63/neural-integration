@@ -1,8 +1,10 @@
+import os
 import numpy as np
+import tensorflow as tf
 
 from encoders import HexagonalSSPSpace
-from decoders import train_decoder_net_sk, train_decoder_net_tf, SSPDecoder
-from utils import generate_path, get_sample_spacing, plot_heatmaps, plot_bounded_path, memory, get_path_bounds, get_bounded_space
+from decoders import train_decoder_net_tf, SSPDecoder
+from utils import generate_path, get_sample_spacing, plot_heatmaps, plot_bounded_path, get_path_bounds, get_bounded_space, apply_kernel
 import pdf
 
 
@@ -27,12 +29,6 @@ def simulate(path, noise_std=0.003, noise_pts=1000, **kwargs):
     return encoder, ssps
 
 
-def plot_ssp_heatmaps(xs, ys, similarities: np.ndarray, num_plots=9, **kwargs):
-    t_spacing = get_sample_spacing(len(similarities), num_plots)
-    plotted_sims = similarities[::t_spacing]
-    plot_heatmaps(xs, ys, plotted_sims, num_plots=len(plotted_sims), **kwargs)
-
-
 def get_similarity_map(xs, ys, ssps: np.ndarray, ssp_space: HexagonalSSPSpace, rescale=True):
     points = pdf.mesh(xs, ys)
     ssp_grid = ssp_space.encode(points) # (timesteps, ssp_dim)
@@ -47,26 +43,35 @@ def get_similarity_map(xs, ys, ssps: np.ndarray, ssp_space: HexagonalSSPSpace, r
         similarities /= 2
     return similarities
 
+def get_ssp_stds(similarities: np.ndarray):
+    std = np.sqrt(get_ssp_var(similarities))
+    return np.stack([std, std], axis=1)
 
 def get_ssp_var(similarities: np.ndarray):
-    stds = pdf.edge_sharpness(similarities)
-    stds -= np.min(stds)
-    stds = np.vstack([stds, stds]).T
-    return stds
+    kernel = np.array([[0, 1, 0], [-1, 0, 1], [0, -1, 0]])
+    edges = apply_kernel(similarities, kernel)
+    avg_edge = np.abs(edges).mean(axis=(1, 2))
+    return _edge_to_var_transform(avg_edge)
+
+def _edge_to_var_transform(arr, A=0.307165, B=7.271e-08, offset=2.756e-07):
+    """Edge strength is logarithmic, but variance is linear. This map is a rough fit to observation."""
+    return A*(np.exp((arr[0] - arr)/B) - 1)
 
 
-@memory.cache
-def get_decoder(bounds: np.ndarray, tf=True, **encoder_kwargs) -> SSPDecoder:
+def get_decoder(bounds: np.ndarray, save_as: str=None, load=True, **encoder_kwargs) -> SSPDecoder:
     ssp_space = HexagonalSSPSpace(domain_dim=2, **encoder_kwargs)
-    if tf:
-        decoder, hist = train_decoder_net_tf(ssp_space, bounds=bounds)
-    else:
-        decoder, hist = train_decoder_net_sk(ssp_space, bounds=bounds)
+    if load and save_as is not None and os.path.exists(save_as):
+        model = tf.keras.models.load_model(save_as)
+        decoder = SSPDecoder(bounds, model, encoder=ssp_space)
+        return decoder
+    decoder, hist = train_decoder_net_tf(ssp_space, bounds=bounds)
+    if save_as is not None:
+        decoder.decoder_network.save(save_as)
     return decoder
 
 
 def decode_ssps(ssps: np.ndarray, bounds: np.ndarray, **kwargs):
-    decoder = get_decoder(bounds, **kwargs)
+    decoder = get_decoder(bounds, save_as='decoder.keras', **kwargs)
     decoded = decoder.decode(ssps)
     return decoded
 
@@ -82,7 +87,7 @@ if __name__ == "__main__":
     encoder, ssps = simulate(path, length_scale=length_scale)
     xs, ys = get_bounded_space(bounds, ppm=30, padding=2)
     similarities = get_similarity_map(xs, ys, ssps, encoder)
-    plot_ssp_heatmaps(xs, ys, similarities, normalize=True)
+    plot_heatmaps(xs, ys, similarities)
 
     decoded_path = decode_ssps(ssps, bounds, length_scale=length_scale)
     timestamps = np.linspace(0, T, num_steps)
