@@ -5,6 +5,8 @@ from scipy.stats import multivariate_normal
 
 
 def gaussian2d(x: np.ndarray, y: np.ndarray, mean: np.ndarray, cov: np.ndarray) -> np.ndarray:
+    if np.all(cov == 0):
+        cov = np.eye(2) * 1e-8
     rv = multivariate_normal(mean, cov)
     domain = mesh(x, y)
     return rv.pdf(domain).reshape(len(x), len(y))

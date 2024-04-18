@@ -48,23 +48,29 @@ def get_ssp_stds(similarities: np.ndarray):
     std = np.sqrt(get_ssp_variance(similarities))
     return np.stack([std, std], axis=1)
 
-def get_ssp_variance(similarities: np.ndarray, method='edge'):
-    """Calculates the estimated variance of the """
-    assert method in ['edge', 'var', 'entropy']
-    if method == 'edge':
-        return get_edge_variance(similarities)
-    elif method == 'var':
-        variance = np.var(similarities, axis=(1, 2))
-        return 430*(variance - variance[0])
-    elif method == 'entropy':
-        entropy = stats.entropy(similarities, axis=(1, 2))
-        return 240*(entropy[0] - entropy)
 
-def get_edge_variance(similarities: np.ndarray):
-    kernel = np.array([[0, 1, 0], [-1, 0, 1], [0, -1, 0]])
-    edges = apply_kernel(similarities, kernel)
-    avg_edge = np.abs(edges).mean(axis=(1, 2))
-    return _edge_to_var_transform(avg_edge)
+def get_ssp_variance(similarities: np.ndarray, method='sharpness'):
+    return get_uncertainty_metric(similarities, method=method)
+
+
+def get_uncertainty_metric(img: np.ndarray, method: str) -> np.ndarray:
+    """Calculates the estimated variance of the """
+    assert method in ['sharpness', 'var', 'entropy']
+    if method == 'sharpness':
+        return sharpness(img)
+    elif method == 'var':
+        variance = np.var(img, axis=(1, 2))
+        return variance
+    elif method == 'entropy':
+        entropy = stats.entropy(img, axis=(1, 2))
+        return entropy
+
+
+def sharpness(img: np.ndarray):
+    laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+    edges = apply_kernel(img, laplacian)
+    avg_edge = np.abs(edges).var(axis=(1, 2))
+    return avg_edge
 
 def _edge_to_var_transform(arr, A=0.11058, B=7.271e-08):
     """Edge strength is logarithmic, but variance is linear. This map is a rough fit to observation."""
@@ -95,7 +101,7 @@ if __name__ == "__main__":
     dt = 0.01
     num_steps = int(T/dt)
     length_scale = 0.1
-    path = generate_path(2000, 2)
+    path = generate_path(num_steps)
     bounds = get_path_bounds(path)
     encoder, ssps = simulate(path, length_scale=length_scale)
     xs, ys = get_bounded_space(bounds, ppm=30, padding=2)
@@ -104,7 +110,7 @@ if __name__ == "__main__":
 
     decoded_path = decode_ssps(ssps, bounds, length_scale=length_scale)
     timestamps = np.linspace(0, T, num_steps)
-    stds = get_ssp_var(similarities)
+    stds = get_uncertainty_metric(similarities)
 
     plot_bounded_path(
         timestamps,

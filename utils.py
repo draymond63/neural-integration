@@ -34,8 +34,10 @@ def get_sample_spacing(og_len: int, num_samples: int):
     return np.ceil(og_len / num_samples).astype(int)
 
 
-def generate_path(n_steps, domain_dim=2, smoothing_window=200):
+def generate_path(n_steps, domain_dim=2, smoothing_window=200, seed=None):
     """Generate a random continuous path in 2D space, of shape (n_steps, domain_dim)"""
+    if seed is not None:
+        np.random.seed(seed)
     path = np.cumsum(np.random.randn(n_steps, domain_dim), axis=0)
     smoothing_window = min(smoothing_window, n_steps)
     window = np.hanning(smoothing_window)
@@ -118,7 +120,9 @@ def get_bounded_space(bounds: np.ndarray, ppm=1, padding=0.1):
     return [np.linspace(lb - padding, ub + padding, p) for (lb, ub), p in zip(bounds, points)]
 
 
-def apply_kernel(sequence, kernel):
+def apply_kernel(sequence: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    assert len(sequence.shape) == 3
+    assert len(kernel.shape) == 2
     res = [None] * sequence.shape[0]
     for i, f in enumerate(sequence):
         npdf = f / np.sum(f)

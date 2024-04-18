@@ -35,14 +35,14 @@ class Agent:
         return self.P[:2, :2]
 
 
-def simulate(path: np.ndarray, dt=0.01, noise=1e-5):
+def simulate(path: np.ndarray, dt=0.01, init_uncertainty=0, process_noise=1e-5, measurement_noise=0, noisy_input=False):
     log = getLogger(__name__)
     log.info("Starting Kalman simulation...")
     vels = np.diff(path, axis=0) / dt
-    if noise:
-        vels += np.random.randn(*vels.shape) * noise
+    if noisy_input and measurement_noise:
+        vels += np.random.randn(*vels.shape) * measurement_noise
     init_state = [*path[0], *vels[0]]
-    agent = Agent(init_state, dt=dt, measurement_noise=noise)
+    agent = Agent(init_state, dt, init_uncertainty, process_noise, measurement_noise)
     positions = np.zeros((len(path), 2))
     positions[0] = path[0]
     covariances = np.zeros((len(path), 2, 2))
@@ -69,11 +69,11 @@ def plot_kalman_heatmaps(xs: np.ndarray, ys: np.ndarray, positions: np.ndarray, 
 
 if __name__ == "__main__":
     np.random.seed(0)
-    T = 10
+    T = 20
     dt = 0.01
     num_steps = int(T / dt)
     path = generate_path(num_steps, 2)
-    positions, covariances = simulate(path, dt=dt, noise=1e-1)
+    positions, covariances = simulate(path, dt=dt, process_noise=1e-5)
 
     bounds = get_path_bounds(path)
     xs, ys = get_bounded_space(bounds, ppm=30)
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     plot_bounded_path(
         timestamps,
         paths={
-            'Truth', [path, np.zeros((len(path), 2))],
-            'Kalman', [positions, stds]
+            'Truth': [path, np.zeros((len(path), 2))],
+            'Kalman': [positions, stds]
         }
     )
